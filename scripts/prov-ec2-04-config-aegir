@@ -1,0 +1,186 @@
+#!/bin/sh
+#
+#   ec2-arch-to-aegir-controller
+#   Transform an Arch Linux LEMP EC2 instance into a Aegir controller.
+#
+#   Copyright (c) 2015 James An <james@jamesan.ca>
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+source utility-library
+tempfile=$(mktemp)
+
+declare hosting_features=(
+  alias                   backup_queue            backup_window           client
+  clone                   cron                    db_server               dns
+  git                     git_checkout            git_pull
+  http_basic_auth         migrate                 nginx                   nginx_ssl
+  package                 platform                queued
+  remote_import           server                  server_data             site
+  site_backup_manager     site_data               subdirs                 sync
+  task                    task_gc                 tasks_extra             web_server
+)
+
+declare modules=(
+  devel
+  token
+  entity
+  entity_operations
+  features
+  module_filter
+  strongarm
+  variable
+  coder
+  deploy
+  jquery_update
+  subpathauto
+)
+
+declare modules_dl=(
+  hosting_drush_aliases-6.x-1.0-alpha4
+)
+declare modules_en=(
+  deploy_ui
+  devel_generate
+  hosting_platform_pathauto
+  variable_admin
+  views_ui
+)
+
+declare modules_6_x=(
+  hosting_drush_aliases
+)
+
+declare -A variables=(
+  [admin_menu_cache_client]=0
+  [admin_menu_tweak_modules]=1
+  [admin_menu_tweak_permissions]=1
+  [admin_menu_tweak_tabs]=1
+  [admin_theme]='seven'
+  [clean_url]=1
+  [configurable_timezones]=0
+  [date_default_timezone]='America/Toronto'
+  [date_first_day]=0
+  [features_default_export_path]='sites/all/modules/features'
+  [file_default_scheme]='public'
+  [file_private_path]='sites//private/files'
+  [file_public_path]='sites//files'
+  [file_temporary_path]='sites//private/temp'
+  [filter_fallback_format]='plain_text'
+  [hosting_default_profile]='minimal'
+  [hosting_platform_base_path]='/usr/share/webapps/aegir/platforms/'
+  [hosting_platform_pathauto_base_path]='/usr/share/webapps/aegir/platforms/'
+  [hosting_queue_task_gc_enabled]=1
+  [hosting_queue_task_gc_frequency]='3600'
+  [hosting_require_disable_before_delete]=0
+  [jquery_update_jquery_version:]='1.11'
+  [maillog_devel]=1
+  [maillog_log]=1
+  [maillog_send]=0
+  [node_admin_theme]=1
+  [pathauto_blog_pattern]='blogs/[user:name]'
+  [pathauto_file_pattern]='files/[file:type:machine-name]/[file:name]'
+  [pathauto_node_pattern]='[node:content-type:machine-name]/[node:title]'
+  [pathauto_punctuation_hyphen]=1
+  [pathauto_taxonomy_term_pattern]='[term:parents:join-path]/[term:name]'
+  [pathauto_user_pattern]='users/[user:roles:first]/[user:name]'
+  [performance]='{
+  "jquery_update_compression_type": "min",
+  "jquery_update_jquery_cdn": "google"
+}'
+  [site_default_country]='CA'
+  [site_mail]='drupal@jamesan.ca'
+  [site_name]=''
+  [special_menu_items_nolink_tag]='<a>'
+  [theme_default]='eldir'
+  [theme_settings]='{
+    "toggle_logo": 1,
+    "toggle_name": 1,
+    "toggle_slogan": 1,
+    "toggle_node_user_picture": 1,
+    "toggle_comment_user_picture": 1,
+    "toggle_comment_user_verification": 1,
+    "toggle_favicon": 1,
+    "toggle_main_menu": 1,
+    "toggle_secondary_menu": 1,
+    "default_logo": 1,
+    "default_favicon": 1
+}'
+  [transliteration_file_lowercase]=1
+  [transliteration_file_uploads]=1
+  [transliteration_file_uploads_display_name]=1
+  [user_admin_role]=0
+  [user_default_timezone]=0
+  [user_register]=0
+  [views_exposed_filter_any_label]='new_any'
+  [views_show_additional_queries]=0
+  [views_ui_always_live_preview]=0
+  [views_ui_display_embed]=1
+  [views_ui_show_advanced_column]=1
+  [views_ui_show_advanced_help_warning]=1
+  [views_ui_show_listing_filters]=0
+  [views_ui_show_master_display]=1
+  [views_ui_show_performance_statistics]=1
+  [views_ui_show_preview_information]=1
+  [views_ui_show_sql_query]=1
+  [views_ui_show_sql_query_where]='below'
+)
+
+#
+# set_variables
+# Sets Drupal variables from key-value pairs stored in a shell associative array.
+#
+# $1 = site alias (without the leading at symbol, @)
+# $2 = the variable name of the key-value-pair array
+#
+set_variables() {
+  local url=$1
+  local -n array=$2
+  [ -n "$3" ] && format=json || format=auto
+
+  # Apply variables for type-grouped arrays
+  for key in "${!array[@]}"; do
+    value="${array[$key]}"
+    [ $(echo "$value" | wc -l) -eq 1 ] && format=auto || format=json
+    sudo -Hu aegir drush @$url vset --exact --yes --format=$format "$key" "$value"
+  done
+}
+
+is_num() {
+  [ $# -eq 1 ] || return 1
+  echo "$a" | grep -o '^\-\?[0-9]*$'
+}
+is_multiline() {
+  [ $# -eq 1 ] || return 1
+  [ $(echo "$a" | wc -l) -eq 1 ] && echo 0 || echo 1
+}
+
+main() {
+  for hosting_feature in "${hosting_features[@]}"; do
+    sudo -Hu aegir drush @hostmaster variable-set --exact --yes --format=int hosting_feature_$hosting_feature 1
+    sudo -Hu aegir drush @hostmaster pm-enable --yes hosting_$hosting_feature
+  done
+  sudo -Hu aegir set_variable hostmaster variables
+  sudo -Hu aegir drush @hostmaster dl --yes "${modules_dl[@]}" "${modules[@]}"
+  sudo -Hu aegir drush @hostmaster dl --yes --default-major=6 "${modules_6_x[@]}"
+  egrep -rIl '^\s*core\s*=\s*6.x\s*$' "$(drush @hm \dd)/sites" | xargs sudo sed -r -i 's#^\s*core\s*=\s*6.x\s*$#core = 7.x#'
+  sudo -Hu aegir drush @hostmaster en --yes "${modules[@]}" "${modules_6_x[@]}" "${modules_en[@]}"
+}
+
+# invoke main function if this script is executed as a command
+if [ "$CMD" = ${BASH_SOURCE##*/} ]; then
+  main "$@"
+else
+  unset main
+fi

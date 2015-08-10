@@ -1,0 +1,98 @@
+#!/bin/sh
+#
+#   ec2-arch-to-aegir-controller
+#   Transform a base Arch Linux EC2 instance into a Aegir controller.
+#
+#   Copyright (c) 2015 James An <james@jamesan.ca>
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+source utility-library
+tempfile=$(mktemp)
+
+main() {
+  _msg 'Securing remote access...'
+
+  _msg2 'Setting up user skeleton directory with GnuPG and SSH...'
+  truncate --size=0 "$tempfile"
+  install --mode=644 -D   /usr/share/doc/gnupg/examples/gpgconf.conf /etc/gnupg/gpgconf.conf
+  install --mode=700 --directory /etc/skel/.gnupg
+  install --mode=700 --directory /etc/skel/.ssh
+  install --mode=600 -D   /usr/share/gnupg/gpg-conf.skel /etc/skel/.gnupg/gpg.conf
+  install --mode=600 "$tempfile" /etc/skel/.gnupg/gpg-agent.conf
+  install --mode=600 "$tempfile" /etc/skel/.gnupg/pubring.gpg
+  install --mode=600 "$tempfile" /etc/skel/.gnupg/secring.gpg
+  install --mode=600 "$tempfile" /etc/skel/.ssh/authorized_keys
+
+  _msg2 'Creating remote-accessible non-root user...'
+  useradd --create-home --no-user-group --gid users cloud-user
+  install --mode=600 -D --owner=cloud-user --group=users /root/.ssh/authorized_keys ~cloud-user/.ssh/authorized_keys
+  install --mode=440 <(echo 'cloud-user ALL=(ALL) NOPASSWD: ALL') /etc/sudoers.d/cloud-user
+
+  _msg2 'Securing and enabling SSH daemon...'
+  rm --force --recursive /root/.ssh
+  declare -A SSH_OPTS=(
+    [LoginGraceTime]=30s
+    [PermitRootLogin]=no
+    [MaxAuthTries]=3
+    [MaxSessions]=5
+    [UseDNS]=no
+    [PasswordAuthentication]=no
+  )
+  for SSH_OPT in "${!SSH_OPTS[@]}"; do
+    declare SSH_VAL=${SSH_OPTS[$SSH_OPT]}
+    sed --regexp-extended --in-place "s/^#($SSH_OPT) .*$/\1 $SSH_VAL/" /etc/ssh/sshd_config
+  done
+  systemctl --now enable sshd
+
+  _msg 'Upgrading and installing system packages...'
+
+  _msg2 'Installing missing base and base-devel packages and remove multilib gcc...'
+  echo -e '\n\ny\ny\n' | pacman --sync --refresh --sysupgrade --needed base base-devel
+
+  _msg2 'Re-creating pacman keyring...'
+  rm -rf /etc/pacman.d/gnupg
+  pacman --noconfirm --sync haveged && systemctl start haveged
+  pacman-key --init
+  systemctl stop haveged && pacman --noconfirm --remove --nosave haveged
+  pacman-key --populate archlinux
+  pacman-key --refresh-keys
+
+  _msg2 'Adding and trusting public GPG key for James An <james@jamesan.ca>'
+  pacman-key --recv-key 001BED01
+  pacman-key --lsign-key 001BED01
+
+  _msg2 'Installing additional system utilities, removing all 32-bit packages...'
+  yes | pacman --sync --needed bash-completion gcc gcc-libs git libpwquality mlocate moreutils rsync unzip wget zip
+  pacman --query --quiet --search 32 | xargs pacman --noconfirm --remove --nosave --recursive linux
+
+  _msg 'Configuring server...'
+
+  _msg2 'Setting systemd options...'
+  hostnamectl set-hostname $(curl http://169.254.169.254/latest/meta-data/public-hostname)
+  hostnamectl set-chassis server
+  hostnamectl set-deployment development
+  hostnamectl set-location 'AWS: us-east-1'
+  timedatectl set-timezone America/Toronto
+  timedatectl set-ntp FALSE
+
+  _msg 'Set up complete!'
+}
+
+# invoke main function if this script is executed as a command
+if [ "$CMD" = ${BASH_SOURCE##*/} ]; then
+  main "$@"
+else
+  unset main
+fi
