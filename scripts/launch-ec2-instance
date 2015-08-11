@@ -38,7 +38,11 @@ declare -a resource_types=(
 )
 
 declare -A ids=(
-  [image]='ami-572c883c'
+  [image]=ami-572c883c
+  [dhcp-options]=sg-a3c2d9c7
+  [vpc]=vpc-bad4d3df
+  [subnet]=subnet-e7f19abe
+  [security-group]=sg-a3c2d9c7
 )
 declare -A names=(
   [image]='arch-linux-hvm-2015.07.30.x86_64-ebs'
