@@ -28,7 +28,7 @@ declare hosting_features=(
   http_basic_auth         migrate                 nginx                   nginx_ssl
   package                 platform                queued
   remote_import           server                  server_data             site
-  site_backup_manager     site_data               subdirs                 sync
+  site_backup_manager     site_data               sync
   task                    task_gc                 tasks_extra             web_server
 )
 
@@ -87,7 +87,7 @@ declare -A variables=(
   [maillog_devel]=1
   [maillog_log]=1
   [maillog_send]=0
-  [node_admin_theme]=1
+  [node_admin_theme]=0
   [pathauto_blog_pattern]='blogs/[user:name]'
   [pathauto_file_pattern]='files/[file:type:machine-name]/[file:name]'
   [pathauto_node_pattern]='[node:content-type:machine-name]/[node:title]'
@@ -170,7 +170,7 @@ main() {
     sudo -Hu aegir drush @hostmaster variable-set --exact --yes --format=int hosting_feature_$hosting_feature 1
     sudo -Hu aegir drush @hostmaster pm-enable --yes hosting_$hosting_feature
   done
-  sudo -Hu aegir set_variable hostmaster variables
+  set_variables hostmaster variables
   sudo -Hu aegir drush @hostmaster dl --yes "${modules_dl[@]}" "${modules[@]}"
   sudo -Hu aegir drush dl --yes --default-major=6 "${modules_6_x[@]}" --destination="$(sudo -Hu aegir drush @hostmaster drupal-directory)/sites/all/modules"
   egrep -rIl '^\s*core\s*=\s*"?6.x"?\s*$' "$(drush @hm \dd)/sites" | xargs sudo sed -r -i 's#^\s*core\s*=\s*"?6.x"?\s*$#core = 7.x#'
