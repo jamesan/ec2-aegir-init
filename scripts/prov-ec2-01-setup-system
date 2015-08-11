@@ -36,9 +36,10 @@ main() {
   install --mode=600 "$tempfile" /etc/skel/.ssh/authorized_keys
 
   _msg2 'Creating remote-accessible non-root user...'
+  echo 'cloud-user ALL=(ALL) NOPASSWD: ALL' >| $tempfile
   useradd --create-home --no-user-group --gid users cloud-user
   install --mode=600 -D --owner=cloud-user --group=users /root/.ssh/authorized_keys ~cloud-user/.ssh/authorized_keys
-  install --mode=440 <(echo 'cloud-user ALL=(ALL) NOPASSWD: ALL') /etc/sudoers.d/cloud-user
+  install --mode=440 $tempfile /etc/sudoers.d/cloud-user
 
   _msg2 'Securing and enabling SSH daemon...'
   rm --force --recursive /root/.ssh

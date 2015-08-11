@@ -46,7 +46,7 @@ main() {
   SQL_CMDS=()
   MY_CNF="[client]\nuser=%USER%\npassword=%PASS%"
   for USERNAME in aegir root; do
-      PASSWORD="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9-_@#$%^&*()_+{}|:<>?=' | fold -w 32 | head -n 1)"
+      PASSWORD="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)"
       FILE="${MY_CNF/\%USER\%/$USERNAME}"
       FILE="${FILE/\%PASS\%/$PASSWORD}"
       HOME="$(eval echo ~$USERNAME)"
@@ -56,7 +56,7 @@ main() {
       SQL_CMDS+=("GRANT ALL PRIVILEGES ON *.* TO '$USERNAME'@'%' IDENTIFIED BY '$PASSWORD' WITH GRANT OPTION;")
   done
   test -v SQL_CMDS && unset SQL_CMDS[${#SQL_CMDS[@]}-1]
-  SQL_CMDS+=(-
+  SQL_CMDS+=(
       "UPDATE mysql.user SET PASSWORD=PASSWORD('$(tail -n1 ~root/.my.cnf | sed 's/^password=//')') WHERE User='root';"
       "DELETE FROM mysql.user WHERE User='';"
       "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');"
