@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+#   ec2-arch-to-aegir-controller
+#   Transform an Arch Linux LEMP EC2 instance into a Aegir controller.
+#
+#   Copyright (c) 2015 James An <james@jamesan.ca>
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not
+
+source utility-library
+tempfile=$(mktemp)
+
+declare -A users=(
+  [jan]=jamesan
+  [uur-rehman]=ubaidsid
+  [ehan]=ehan-dresources
+  [omanzoor-mir]=mirowais
+  [bthiyagarajan]=bala-drg
+  [rchandra]=rchadha
+  [sprabhu]=sreedhar-drg
+  [vthakur]=vivekthakur-drg
+  [vbhatia]=zorbathebuddha
+)
+
+main() {
+  _msg "Creating ${#users[@]} users:"
+  for user in "${!users[@]}"; do
+    _msg2 "Creating $user..."
+    useradd --gid users --groups http --create-home --no-user-group $user
+    passwd --delete $user
+  done
+
+  _msg "Fetching user SSH public keys via GitHub's API:"
+  for user in "${!users[@]}"; do
+    _msg2 "Fetching $user's key..."
+    user_github="${users[$user]}"
+    user_home="$(eval echo ~$user)"
+    curl https://api.github.com/users/$user_github/keys | jq '.[].key' | tr --delete '"' >| $user_home/.ssh/authorized_keys
+  done
+
+  _msg2 'Enabling password-less sudo access for all users...'
+  echo '%users ALL=(ALL) NOPASSWD: ALL' >| $tempfile
+  install --mode=400 $tempfile /etc/sudoers.d/users
+
+  systemctl restart sshd.service
+  systemctl enable --now sshd.service
+}
+
+# invoke main function if this script is executed as a command
+if [ "$CMD" = ${BASH_SOURCE##*/} ]; then
+  main "$@"
+else
+  unset main
+fi
