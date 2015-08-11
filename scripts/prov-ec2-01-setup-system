@@ -70,12 +70,12 @@ main() {
   pacman-key --populate archlinux
   pacman-key --refresh-keys
 
-  _msg2 'Adding and trusting public GPG key for James An <james@jamesan.ca>'
-  pacman-key --recv-key 001BED01
-  pacman-key --lsign-key 001BED01
+  _msg2 'Adding and trusting public GPG key for James An <james@jamesan.ca> and Steven Noonan <steven@uplinklabs.net>'
+  pacman-key --recv-key 001BED01 A7B30DB9
+  pacman-key --lsign-key 001BED01 A7B30DB9
 
   _msg2 'Installing additional system utilities, removing all 32-bit packages...'
-  yes | pacman --sync --needed bash-completion gcc gcc-libs git libpwquality mlocate moreutils rsync unzip wget zip
+  yes | pacman --sync --needed bash-completion byobu gcc gcc-libs git jq libpwquality mlocate moreutils rsync unzip wget zip
   pacman --query --quiet --search 32 | xargs pacman --noconfirm --remove --nosave --recursive linux
 
   _msg 'Configuring server...'
