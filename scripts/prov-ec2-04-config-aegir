@@ -48,7 +48,6 @@ declare modules=(
 )
 
 declare modules_dl=(
-  hosting_drush_aliases-6.x-1.0-alpha4
 )
 declare modules_en=(
   deploy_ui
@@ -173,8 +172,8 @@ main() {
   done
   sudo -Hu aegir set_variable hostmaster variables
   sudo -Hu aegir drush @hostmaster dl --yes "${modules_dl[@]}" "${modules[@]}"
-  sudo -Hu aegir drush @hostmaster dl --yes --default-major=6 "${modules_6_x[@]}"
-  egrep -rIl '^\s*core\s*=\s*6.x\s*$' "$(drush @hm \dd)/sites" | xargs sudo sed -r -i 's#^\s*core\s*=\s*6.x\s*$#core = 7.x#'
+  sudo -Hu aegir drush dl --yes --default-major=6 "${modules_6_x[@]}" --destination="$(sudo -Hu aegir drush @hostmaster drupal-directory)/sites/all/modules"
+  egrep -rIl '^\s*core\s*=\s*"?6.x"?\s*$' "$(drush @hm \dd)/sites" | xargs sudo sed -r -i 's#^\s*core\s*=\s*"?6.x"?\s*$#core = 7.x#'
   sudo -Hu aegir drush @hostmaster en --yes "${modules[@]}" "${modules_6_x[@]}" "${modules_en[@]}"
 }
 
