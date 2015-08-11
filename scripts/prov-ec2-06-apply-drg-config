@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+#   ec2-arch-to-aegir-controller
+#   Transform an Arch Linux LEMP EC2 instance into a Aegir controller.
+#
+#   Copyright (c) 2015 James An <james@jamesan.ca>
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+source utility-library
+tempfile=$(mktemp)
+
+main() {
+  _msg "Pre-authorising GitHub.com's SSH host keys..."
+  sudo -Hu aegir ssh-keyscan github.com | sudo tee -a ~aegir/.ssh/known_hosts &>/dev/null
+
+  _msg "Installing phpseclib and enabling OpenSSL PHP extension..."
+  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync pear-phpseclib
+  echo 'extension=openssl.so' >| $tempfile
+  install -m644 $tempfile /etc/php/conf.d/openssl.ini
+}
+
+# invoke main function if this script is executed as a command
+if [ "$CMD" = ${BASH_SOURCE##*/} ]; then
+  main "$@"
+else
+  unset main
+fi

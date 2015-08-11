@@ -166,15 +166,25 @@ is_multiline() {
 }
 
 main() {
+  _msg 'Enabling Aegir capabilities...'
   for hosting_feature in "${hosting_features[@]}"; do
     sudo -Hu aegir drush @hostmaster variable-set --exact --yes --format=int hosting_feature_$hosting_feature 1
     sudo -Hu aegir drush @hostmaster pm-enable --yes hosting_$hosting_feature
   done
+
+  _msg "Defining Aegir's Hostmaster site-wide variables..."
   set_variables hostmaster variables
+
+  _msg "Installing additional contrib modules..."
   sudo -Hu aegir drush @hostmaster dl --yes "${modules_dl[@]}" "${modules[@]}"
   sudo -Hu aegir drush dl --yes --default-major=6 "${modules_6_x[@]}" --destination="$(sudo -Hu aegir drush @hostmaster drupal-directory)/sites/all/modules"
   egrep -rIl '^\s*core\s*=\s*"?6.x"?\s*$' "$(drush @hm \dd)/sites" | xargs sudo sed -r -i 's#^\s*core\s*=\s*"?6.x"?\s*$#core = 7.x#'
   sudo -Hu aegir drush @hostmaster en --yes "${modules[@]}" "${modules_6_x[@]}" "${modules_en[@]}"
+
+  _msg "Generating SSH key for Aegir and pre-authorising GitHub.com's SSH host key..."
+  sudo -Hu aegir ssh-keygen -t rsa -N "" -f ~aegir/.ssh/id_rsa
+
+  systemctl start aegir.target
 }
 
 # invoke main function if this script is executed as a command

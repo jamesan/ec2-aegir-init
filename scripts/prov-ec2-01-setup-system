@@ -34,6 +34,7 @@ main() {
   install --mode=600 "$tempfile" /etc/skel/.gnupg/pubring.gpg
   install --mode=600 "$tempfile" /etc/skel/.gnupg/secring.gpg
   install --mode=600 "$tempfile" /etc/skel/.ssh/authorized_keys
+  install --mode=600 "$tempfile" /etc/skel/.ssh/known_hosts
 
   _msg2 'Creating remote-accessible non-root user...'
   echo 'cloud-user ALL=(ALL) NOPASSWD: ALL' >| $tempfile
