@@ -171,6 +171,8 @@ main() {
     sudo -Hu aegir drush @hostmaster variable-set --exact --yes --format=int hosting_feature_$hosting_feature 1
     sudo -Hu aegir drush @hostmaster pm-enable --yes hosting_$hosting_feature
   done
+  _msg2 'Starting hosting queue daemon...'
+  systemctl start aegir.target
 
   _msg "Defining Aegir's Hostmaster site-wide variables..."
   set_variables hostmaster variables
