@@ -12,6 +12,8 @@ token_counter=03
 tag_prefix='insight-'
 tag_suffix='-us-e1a'
 vpc_cidr='192.168.255.240/28'
+environment='dev'
+availability_zone='us-east-1a'
 
 # Source IP addresses for firewall whitelist.
 ip_addrs=(
@@ -170,7 +172,17 @@ function create_aws_resources() {
         "MinCount": 1,
         "MaxCount": 1,
         "KeyName": "'$tag_prefix$instance_name$tag_suffix'",
+        "SecurityGroupIds": [
+          "'${ids[security-group]}'"
+        ],
+        "UserData": "#!/bin/sh
+hostnamectl set-hostname '"'"'insight-'$environment'.decisionresourcesgroup.com'"'"'
+hostnamectl set-location '"'"'AWS: '$availability_zone"'"'",
         "InstanceType": "'$instance_type'",
+        "Placement": {
+          "AvailabilityZone": "'$availability_zone'",
+          "Tenancy": "default"
+        },
         "BlockDeviceMappings": [
           {
             "DeviceName": "/dev/sda1",
