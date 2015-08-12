@@ -1,7 +1,8 @@
 #!/bin/sh
 #
-#   ec2-arch-to-aegir-controller
-#   Transform an Arch Linux LEMP EC2 instance into a Aegir controller.
+#   prov-ec2-05-create-users
+#   Create shell users and fetch their SSH public keys from GitHub. Part of
+#   the prov-ec2 script series.
 #
 #   Copyright (c) 2015 James An <james@jamesan.ca>
 #
@@ -49,12 +50,12 @@ main() {
     curl https://api.github.com/users/$user_github/keys | jq '.[].key' | tr --delete '"' >| $user_home/.ssh/authorized_keys
   done
 
-  _msg2 'Enabling password-less sudo access for all users...'
+  _msg 'Enabling password-less sudo access for all users and restarting SSH daemon...'
   echo '%users ALL=(ALL) NOPASSWD: ALL' >| $tempfile
   install --mode=400 $tempfile /etc/sudoers.d/users
-
   systemctl restart sshd.service
-  systemctl enable --now sshd.service
+
+  _msg 'Set up complete!'
 }
 
 # invoke main function if this script is executed as a command

@@ -1,7 +1,8 @@
 #!/bin/sh
 #
-#   ec2-arch-to-aegir-controller
-#   Transform a base Arch Linux EC2 instance into a Aegir controller.
+#   prov-ec2-01-setup-system
+#   Configure basic server setup for an EC2 instance launched from a base
+#   Arch Linux AMI. Part of the prov-ec2 script series.
 #
 #   Copyright (c) 2015 James An <james@jamesan.ca>
 #

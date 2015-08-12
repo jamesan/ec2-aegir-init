@@ -1,7 +1,7 @@
 #!/bin/sh
 #
-#   ec2-arch-to-aegir-controller
-#   Transform an Arch Linux LEMP EC2 instance into a Aegir controller.
+#   prov-ec2-03-install-lemp-aegir
+#   Install LEMP packages and Aegir. Part of the prov-ec2 script series.
 #
 #   Copyright (c) 2015 James An <james@jamesan.ca>
 #
@@ -93,7 +93,7 @@ main() {
         --yes
   sudo systemctl enable --now aegir.target
 
-  ~ _msg 'Set up complete!'
+  _msg 'Set up complete!'
 }
 
 # invoke main function if this script is executed as a command

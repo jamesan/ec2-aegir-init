@@ -1,7 +1,8 @@
 #!/bin/sh
 #
-#   ec2-arch-to-aegir-controller
-#   Transform an Arch Linux LEMP EC2 instance into a Aegir controller.
+#   prov-ec2-06-apply-drg-config
+#   Apply configuration settings specific to DRG's Insight Platform project.
+#   Part of the prov-ec2 script series.
 #
 #   Copyright (c) 2015 James An <james@jamesan.ca>
 #
