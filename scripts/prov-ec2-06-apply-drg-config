@@ -22,6 +22,11 @@
 source utility-library
 tempfile=$(mktemp)
 
+github_user=jamesan
+github_token=e227e82cd68bfceef77a943191da6d829891aec7
+github_repo_url=https://api.github.com/repos/dresources/insight-platform
+key_title='R/O password-less key for :ENV: Aegir System User'
+
 main() {
   _msg "Pre-authorising GitHub.com's SSH host keys..."
   sudo -Hu aegir ssh-keyscan github.com | sudo tee -a ~aegir/.ssh/known_hosts &>/dev/null
@@ -30,6 +35,32 @@ main() {
   sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync pear-phpseclib
   echo 'extension=openssl.so' >| $tempfile
   install -m644 $tempfile /etc/php/conf.d/openssl.ini
+
+  _msg "Replacing a deploy key for this environment with Aegir's current SSH public key..."
+  environment=$(hostname | egrep -o '(dev|qa|stg)')
+  environment=${environment^^}
+  keys=($(curl --user $github_user:$github_token $github_repo_url/keys | \
+    jq 'map(
+      if (.title | test ("'$environment'")) then
+        .id
+      else
+        empty
+      end
+    )' | head -n-1 | tail -n+2 | tr -d ' ,'))
+  _msg2 "Deleting old key(s) for the current environment, $environment..."
+  for key in e; do
+    curl --user $github_user:$github_token --request DELETE $github_repo_url/keys/$key
+  done
+
+  key_data="{
+  \"title\": \"${key_title/:ENV:/$environment}\",
+  \"key\": \"$(cat ~aegir/.ssh/id_rsa.pub)\",
+  \"read_only\": true
+}"
+  _msg2 "Adding new R/O deploy key..."
+  curl --user $github_user:$github_token --request POST \
+    --data "$key_data" $github_repo_url/keys
+  _msg 'Set up complete!'
 }
 
 # invoke main function if this script is executed as a command
