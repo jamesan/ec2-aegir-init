@@ -1,0 +1,111 @@
+#!/bin/sh
+
+path_repo=/usr/share/webapps/aegir/platforms/insight_platform_test
+path_temp=$(mktemp -d)
+
+declare extensions=(
+  ae_auth                 ae_users                configuration_settings
+  content_mock            content_model_bundles   content_page_structures
+  insight_charts          insight_install         insight_platform
+  insight_theme           solr_search
+)
+
+declare -A dirnames=(
+  [ae_auth]=sites/all/modules/custom
+  [ae_users]=sites/all/modules/features
+  [configuration_settings]=sites/all/modules/features
+  [content_mock]=sites/all/modules/features
+  [content_model_bundles]=sites/all/modules/features
+  [content_page_structures]=sites/all/modules/features
+  [insight_charts]=sites/all/modules/custom
+  [insight_install]=profiles
+  [insight_platform]=sites/all/modules/custom
+  [insight_theme]=sites/all/themes/custom
+  [solr_search]=sites/all/modules/features
+  [theme_settings]=sites/all/modules/custom
+)
+
+declare -A new_names=(
+  [ae_auth]=insight_auth
+  [ae_users]=insight_users
+  [configuration_settings]=insight_config
+  [content_mock]=insight_mock_content
+  [content_model_bundles]=insight_content_model
+  [content_page_structures]=insight_content_model_old
+  [insight_charts]=insight_charts
+  [insight_install]=insight_install
+  [insight_platform]=insight_platform
+  [insight_theme]=insight_theme
+  [solr_search]=insight_search
+  [theme_settings]=insight_theme_settings
+)
+
+# Rename each extension's entries in the main repo, minding the index and submodules.
+for extension in "${extensions[@]}"; do
+  dirname="${dirnames[$extension]}"
+  new_name="${new_names[$extension]}"
+
+  # Skip if no renaming is needed.
+  [ "$extension" = "$new_name" ] && continue
+
+  mv $dirname/$extension $dirname/$new_name
+
+  find . -name .git -type f -print0 -type f | xargs -0 sed -i "s|$extension|$new_name|g"
+  find . -name .gitmodules -type f -print0 -type f | xargs -0 sed -i "s|$extension|$new_name|g"
+  find . -name config -print0 -type f | xargs -0 sed -i "s|$extension|$new_name|g"
+
+  git add .gitmodules
+  mv .git/modules/$dirname/$extension .git/modules/$dirname/$new_name
+
+  git add $dirname/$new_name
+  git rm -r $dirname/$extension
+
+  git commit -m "Renamed extension from $extension to $new_name and adjusted submodule and index entries."
+done
+
+for extension in "${extensions[@]}"; do
+  dirname="${dirnames[$extension]}"
+  new_name="${new_names[$extension]}"
+
+  # Rename files if the extension name is changing
+  if [ "$extension" != "$new_name" ]; then
+    # Rename files with the extension name as part of its filename.
+    # This ignores folders with the extension name as part of its name.
+    find $dirname/$new_name -type f -name "*$extension*" | while read file; do
+      path=$(dirname $file)
+      path=${path/$dirname\/$new_name/}
+      [ -n "$path" ] && path="${path:1}/"
+      file=$(basename $file)
+      git -C $dirname/$new_name mv $path$file $path${file/$extension/$new_name}
+    done
+  fi
+
+  # Replace all occurrences of all old extension names with their new counterparts.
+  find $dirname/$new_name -type f | xargs sed --in-place \
+    -e "s/ae_auth/insight_auth/g" \
+    -e "s/ae_users/insight_users/g" \
+    -e "s/configuration_settings/insight_config/g" \
+    -e "s/content_mock/insight_mock_content/g" \
+    -e "s/content_model_bundles/insight_content_model/g" \
+    -e "s/content_page_structures/insight_content_model_old/g" \
+    -e "s/solr_search/insight_search/g" \
+    -e "s/theme_settings/insight_theme_settings/g"
+
+  grep -rIl 'insight_insight_theme_settings' | xargs --no-run-if-empty sed 's/insight_insight_theme_settings/insight_theme_settings/g'
+
+  # Commit these changes and push upstream.
+  git -C $dirname/$new_name add -A
+  git -C $dirname/$new_name commit -m "Fixed mentions of custom extensions in the .info file to their new names."
+  git -C $dirname/$new_name push
+done
+
+find . -name drushrc.php | xargs sudo sed --in-place \
+  -e "s/ae_auth/insight_auth/g" \
+  -e "s/ae_users/insight_users/g" \
+  -e "s/configuration_settings/insight_config/g" \
+  -e "s/content_mock/insight_mock_content/g" \
+  -e "s/content_model_bundles/insight_content_model/g" \
+  -e "s/content_page_structures/insight_content_model_old/g" \
+  -e "s/solr_search/insight_search/g" \
+  -e "s/theme_settings/insight_theme_settings/g"
+

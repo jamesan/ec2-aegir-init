@@ -1,0 +1,65 @@
+#!/bin/sh
+
+path_repo=/usr/share/webapps/aegir/platforms/insight_platform_test
+path_temp=$(mktemp -d)
+
+declare extensions=(
+  ae_auth                 ae_users                configuration_settings
+  content_mock            content_model_bundles   content_page_structures
+  insight_charts          insight_install         insight_platform
+  insight_theme           solr_search             theme_settings
+)
+
+declare -A paths=(
+  [ae_auth]=sites/all/modules/custom/ae_auth
+  [ae_users]=sites/all/modules/features/ae_users
+  [configuration_settings]=sites/all/modules/features/configuration_settings
+  [content_mock]=sites/all/modules/features/content_mock
+  [content_model_bundles]=sites/all/modules/features/content_model_bundles
+  [content_page_structures]=sites/all/modules/features/content_page_structures
+  [insight_charts]=sites/all/modules/custom/insight_charts
+  [insight_install]=profiles/insight_install
+  [insight_platform]=sites/all/modules/custom/insight_platform
+  [insight_theme]=sites/all/themes/custom/insight_theme
+  [solr_search]=sites/all/modules/features/solr_search
+  [theme_settings]=sites/all/modules/custom/theme_settings
+)
+
+declare -A descriptions=(
+  [ae_auth]='Allows Drupal to use A&E as a service for authentication and access control.'
+  [ae_users]='Client user related settings, profile fields, and other objects. Also, stores A&E-related configurations.'
+  [configuration_settings]='Feature-ised container for ad-hoc site-wide config settings.'
+  [content_mock]='Actual mock content for the various entity bundles defined by Content Page Structures.'
+  [content_model_bundles]='Field bundles mirroring the Alfresco content model.'
+  [content_page_structures]='Node bundles, view definitions, and block configuration making up the content page and related data objects.'
+  [insight_charts]='Visualisation of Insight Data.'
+  [insight_install]='Set up Insight Platform on this Drupal instance.'
+  [insight_platform]='Transforms a Drupal minimal install into the Insight Platform.'
+  [solr_search]='Blocks, Views, and Solr objects to enable site-wide search capabilities.'
+  [theme_settings]='Add admin and default theme into module dependency chain.'
+)
+
+for extension in "${extensions[@]}"; do
+  path="${paths[$extension]}"
+  description="${descriptions[$extension]}"
+  pushd $path_repo
+  git subtree split --prefix=$path --branch=$ext
+
+  path_ext=$path_temp/$extension
+  mkdir --parents $path_ext
+  pushd $path_ext
+  git init
+  git pull --no-edit $path_repo $extension
+
+  hub create dresources/$extension -p -d $description
+  git remote add origin git@github.com:dresources/$extension.git
+  git pull --no-edit origin master
+  git push --set-upstream origin master
+
+  popd
+  rm -rf $path_ext
+
+  git rm -rf $path
+  git submodule add git@github.com:dresources/$extension.git $path
+  git commit -m "Moved $extension extension into its own repo and added it back as a submodule."
+done
