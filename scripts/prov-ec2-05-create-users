@@ -40,7 +40,11 @@ main() {
     _msg2 "Creating $user..."
     useradd --gid users --groups http --create-home --no-user-group $user
     passwd --delete $user
+    sudo --set-home --user=$user ln --symbolic /usr/share/webapps $(eval echo ~$user)
+    echo -e "\ncd ~/webapps/aegir/platforms" >> $(eval echo ~$user)/.bash_profile
   done
+  ln --symbolic /usr/share/webapps /etc/skel
+    echo -e "\ncd ~/webapps/aegir/platforms" >> /etc/skel/.bash_profile
 
   _msg "Fetching user SSH public keys via GitHub's API:"
   for user in "${!users[@]}"; do
