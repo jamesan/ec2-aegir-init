@@ -78,6 +78,9 @@ declare -A variables=(
   [file_temporary_path]='sites//private/temp'
   [filter_fallback_format]='plain_text'
   [hosting_default_profile]='minimal'
+  [hosting_delete_backups]='always'
+  [hosting_ignore_default_profiles]=1
+  [hosting_lock_platforms_by_default]=1
   [hosting_platform_base_path]='/usr/share/webapps/aegir/platforms/'
   [hosting_platform_pathauto_base_path]='/usr/share/webapps/aegir/platforms/'
   [hosting_queue_task_gc_enabled]=1
@@ -172,7 +175,7 @@ main() {
     sudo -Hu aegir drush @hostmaster pm-enable --yes hosting_$hosting_feature
   done
   _msg2 'Starting hosting queue daemon...'
-  systemctl start aegir.target
+  systemctl enable --now aegir.target
 
   _msg "Defining Aegir's Hostmaster site-wide variables..."
   set_variables hostmaster variables
@@ -182,9 +185,6 @@ main() {
   sudo -Hu aegir drush dl --yes --default-major=6 "${modules_6_x[@]}" --destination="$(sudo -Hu aegir drush @hostmaster drupal-directory)/sites/all/modules"
   egrep -rIl '^\s*core\s*=\s*"?6.x"?\s*$' "$(drush @hm \dd)/sites" | xargs sudo sed -r -i 's#^\s*core\s*=\s*"?6.x"?\s*$#core = 7.x#'
   sudo -Hu aegir drush @hostmaster en --yes "${modules[@]}" "${modules_6_x[@]}" "${modules_en[@]}"
-
-  _msg "Generating SSH key for Aegir and pre-authorising GitHub.com's SSH host key..."
-  sudo -Hu aegir ssh-keygen -t rsa -N "" -f ~aegir/.ssh/id_rsa
 
   _msg 'Set up complete!'
 }

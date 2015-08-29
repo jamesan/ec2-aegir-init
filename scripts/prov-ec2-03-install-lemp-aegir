@@ -25,7 +25,7 @@ main() {
   _msg 'Setting up Aegir/LEMP stack...'
 
   _msg2 'Installing LEMP stack packages...'
-  pacman --noconfirm --sync mariadb nginx php-fpm
+  pacman --noconfirm --sync --needed mariadb nginx php-fpm
 
   _msg2 'Installing TU repo and AUR helpers...'
   sed --in-place '/\[core\]/i\[quarry]\nServer = http://pkgbuild.com/~anatolik/quarry/x86_64\n' /etc/pacman.conf
@@ -33,15 +33,16 @@ main() {
   for PACKAGE in package-query yaourt; do
     curl --location https://aur4.archlinux.org/cgit/aur.git/snapshot/$PACKAGE.tar.gz | sudo -u cloud-user tar --extract --file - --gzip --directory=/tmp
     pushd /tmp/$PACKAGE
-    sudo -u cloud-user makepkg --install --syncdeps --noconfirm
+    sudo -u cloud-user makepkg --install --syncdeps --noconfirm --needed
     popd
   done
 
   _msg2 'Installing aegir and mailcatcher...'
-  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync ruby-mailcatcher drush-git
-  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync aegir
+  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed ruby-mailcatcher drush-git
+  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed aegir
 
   _msg 'Generate per-user MySQL credentials and disable all shell password authentication...'
+  [ -d /var/lib/mysql ] && rm --force --recursive /var/lib/mysql
   mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql && systemctl start mysqld.service
   SQL_CMDS=()
   MY_CNF="[client]\nuser=%USER%\npassword=%PASS%"
@@ -81,7 +82,7 @@ main() {
 
   _msg2 'Setting up msmtp and mailcatcher as an SMTP server emulator...'
   systemctl enable --now mailcatcher.service mailcatcher-smtp.socket
-  cp /etc/msmtprc.aegir /etc/msmtprc
+  cp --force /etc/msmtprc.aegir /etc/msmtprc
 
   _msg2 'Setting up the Aegir frontend, Hostmaster...'
   sudo -Hu aegir drush hostmaster-install --web_group=http --http_service_type=nginx \
