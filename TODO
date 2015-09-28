@@ -1,0 +1,16 @@
+List of intended fixes, feature additions, and other changes:
+
+- add setting for nginx variable client_max_body_size in the http context (in /usr/share/webapps/aegir/config/server_master/nginx/pre.d/upload-size.ini)
+- add setting for php variable upload_max_filesize and post_max_size (in /etc/php/conf.d/req.drush.ini)
+- add basic .bashrc and .bash_profile for all users
+- add DRG-specific platform creation and default install profile
+- add ncdu and htop to EC2 provision build
+- add hosting_git extension to drush build using a PKGBUILD
+
+sudo -Hu aegir git clone --depth=1 --recursive --branch $env git@github.com:dresources/insight-platform.git /usr/share/webapps/aegir/platforms/insight_platform_$env
+chown -R aegir:http /etc/drush /usr/share/webapps/{aegir,hostmaster}
+sudo setfacl -R -m g:http:rwx /etc/drush /usr/share/webapps/aegir/platforms
+
+
+DEVSHOP?
+https://github.com/opendevshop/devshop
