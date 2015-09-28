@@ -34,7 +34,7 @@ environment=${environment:-DEV}
 
 main() {
   _msg "Installing phpseclib and enabling OpenSSL PHP extension..."
-  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync pear-phpseclib
+  sudo -u user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed pear-phpseclib
   echo 'extension=openssl.so' >| $tempfile
   install -m644 $tempfile /etc/php/conf.d/openssl.ini
 

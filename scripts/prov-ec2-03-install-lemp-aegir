@@ -33,15 +33,15 @@ main() {
   }
   pacman --sync --refresh
   for PACKAGE in package-query yaourt; do
-    curl --location https://aur4.archlinux.org/cgit/aur.git/snapshot/$PACKAGE.tar.gz | sudo -u cloud-user tar --extract --file - --gzip --directory=/tmp
+    curl --location https://aur4.archlinux.org/cgit/aur.git/snapshot/$PACKAGE.tar.gz | sudo -u user tar --extract --file - --gzip --directory=/tmp
     pushd /tmp/$PACKAGE
-    sudo -u cloud-user makepkg --install --syncdeps --noconfirm --needed
+    sudo -u user makepkg --install --syncdeps --noconfirm --needed
     popd
   done
 
   _msg2 'Installing aegir and mailcatcher...'
-  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed ruby-mailcatcher drush-git
-  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed aegir
+  sudo -u user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed ruby-mailcatcher drush-git
+  sudo -u user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed aegir
 
   _msg 'Generate per-user MySQL credentials and disable all shell password authentication...'
   [ "$(systemctl is-active mysqld.service)" = 'active' ] && systemctl stop mysqld.service
