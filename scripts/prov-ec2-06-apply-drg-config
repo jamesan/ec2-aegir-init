@@ -63,31 +63,37 @@ main() {
   echo 'extension=openssl.so' >| $tempfile
   install -m644 $tempfile /etc/php/conf.d/openssl.ini
 
-  _msg "Preparing Aegir's GitHub.com access..."
-  # Fetch repo's deploy keys and filter based on the presence of the
-  # environment string in the key title.
-  _msg2 "Deleting old key(s) for the current environment, $environment..."
-  keys=($(curl --user $github_user:$github_token $github_repo_url/keys | \
-    jq 'map(
-      if (.title | test ("'$environment'")) then
-        .id
-      else
-        empty
-      end
-    )' | head -n-1 | tail -n+2 | tr -d ' ,'))
-  for key in e; do
-    curl --user $github_user:$github_token --request DELETE $github_repo_url/keys/$key
-  done
+  _msg "Defining DRG's Hostmaster site-wide variables..."
+  set_variables hostmaster variables
 
-  # Prepare JSON payload for the new SSH public key
-  _msg2 "Adding new R/O deploy key..."
-  key_data="{
-  \"title\": \"${key_title/:ENV:/$environment}\",
-  \"key\": \"$(cat ~aegir/.ssh/id_rsa.pub)\",
-  \"read_only\": true
-}"
-  curl --user $github_user:$github_token --request POST \
-    --data "$key_data" $github_repo_url/keys
+  _msg "Generating SSH key for Aegir and pre-authorising GitHub.com's SSH host key..."
+  [ -f ~aegir/.ssh/id_rsa ] || sudo -Hu aegir ssh-keygen -t rsa -N "" -f ~aegir/.ssh/id_rsa
+
+  #~ _msg "Preparing Aegir's GitHub.com access..."
+  #~ # Fetch repo's deploy keys and filter based on the presence of the
+  #~ # environment string in the key title.
+  #~ _msg2 "Deleting old key(s) for the current environment, $environment..."
+  #~ keys=($(curl --user $github_user:$github_token $github_repo_api_url/keys | \
+    #~ jq 'map(
+      #~ if (.title | test ("'$environment'")) then
+        #~ .id
+      #~ else
+        #~ empty
+      #~ end
+    #~ )' | head -n-1 | tail -n+2 | tr -d ' ,'))
+  #~ for key in keys; do
+    #~ curl --user $github_user:$github_token --request DELETE $github_repo_url/keys/$key
+  #~ done
+
+  #~ # Prepare JSON payload for the new SSH public key
+  #~ _msg2 "Adding new R/O deploy key..."
+  #~ key_data="{
+  #~ \"title\": \"${key_title/:ENV:/$environment}\",
+  #~ \"key\": \"$(cat ~aegir/.ssh/id_rsa.pub)\",
+  #~ \"read_only\": true
+#~ }"
+  #~ curl --user $github_user:$github_token --request POST \
+    #~ --data "$key_data" $github_repo_url/keys
 
 
   _msg2 "Pre-authorising GitHub.com's SSH host keys..."
