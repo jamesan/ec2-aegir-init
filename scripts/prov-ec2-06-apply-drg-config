@@ -66,7 +66,9 @@ main() {
 
 
   _msg2 "Pre-authorising GitHub.com's SSH host keys..."
-  ssh-keyscan github.com | sudo -Hu aegir tee -a ~aegir/.ssh/known_hosts &>/dev/null
+  [ -z "$(grep github.com ~aegir/.ssh/known_hosts)" ] && \
+    ssh-keyscan github.com | \
+    sudo -Hu aegir tee -a ~aegir/.ssh/known_hosts &>/dev/null
 
   _msg 'Set up complete!'
 }
