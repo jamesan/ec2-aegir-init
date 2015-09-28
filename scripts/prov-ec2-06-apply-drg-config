@@ -24,9 +24,34 @@ tempfile=$(mktemp)
 
 # Declare GitHub-related constants.
 github_user=jamesan
-github_token=e227e82cd68bfceef77a943191da6d829891aec7
+github_token=14d01e098f86d03f0be049f66196925977aaff9a
 github_repo_api_url=https://api.github.com/repos/dresources/insight-platform
 key_title='R/O password-less key for :ENV: Aegir System User'
+
+# Set DRG-specific Aegir hostmaster variables
+declare -A variables=(
+  ['hosting_default_profile']='insight_install'
+)
+
+#
+# set_variables
+# Sets Drupal variables from key-value pairs stored in a shell associative array.
+#
+# $1 = site alias (without the leading at symbol, @)
+# $2 = the variable name of the key-value-pair array
+#
+set_variables() {
+  local url=$1
+  local -n array=$2
+  [ -n "$3" ] && format=json || format=auto
+
+  # Apply variables for type-grouped arrays
+  for key in "${!array[@]}"; do
+    value="${array[$key]}"
+    [ $(echo "$value" | wc -l) -eq 1 ] && format=auto || format=json
+    sudo -Hu aegir drush @$url vset --exact --yes --format=$format "$key" "$value"
+  done
+}
 
 # Derive environment string from server hostname, otherwise default to DEV.
 environment=$(hostname | egrep -o '(dev|qa|stg|adm)' | head -n1 | tr '[:lower:]' '[:upper:]')

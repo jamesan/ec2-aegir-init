@@ -68,9 +68,9 @@ main() {
       "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
       "FLUSH PRIVILEGES;"
   )
-  mv "$(eval echo ~$USERNAME)"/.my.cnf "$(eval echo ~$USERNAME)"/.my.cnf~
+  mv /root/.my.cnf{,~}
   mysql --user=root --execute="${SQL_CMDS[*]}"
-  mv "$(eval echo ~$USERNAME)"/.my.cnf~ "$(eval echo ~$USERNAME)"/.my.cnf
+  mv /root/.my.cnf{~,}
 
   _msg 'Setting up LEMP stack as dedicated Drupal host and Aegir controller'
 
