@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+#   run-prov-scripts-at
+#   Upload, install, and execute provision script series given the
+#   IP address or FQDN of an EC2 instance.
+#
+#   Copyright (c) 2015 James An <james@jamesan.ca>
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+source /usr/local/bin/utility-library
+tempfile=$(mktemp)
+hostname=$1
+
+main() {
+  _msg 'Running provision scripts...'
+
+  _msg2 'Uploading provision scripts'
+  grep -v ^$hostname ~/.ssh/known_hosts | sponge ~/.ssh/known_hosts
+  ssh-keyscan $hostname >> ~/.ssh/known_hosts
+  ssh root@$hostname exit &>/dev/null
+  
+  if [ $? -eq 0 ]; then
+    USER=root
+    SUDO=
+  else
+    USER=cloud-user
+    SUDO=sudo
+  fi
+  ssh $USER@$hostname $SUDO rm /tmp/1* /tmp/utility-library
+  scp 1{0..6}-* utility-library $USER@$hostname:/tmp
+  ssh $USER@$hostname $SUDO sh /tmp/10-init-scripts
+
+  _msg 'Set up complete!'
+}
+
+# invoke main function if this script is executed as a command
+if [ "$CMD" = ${BASH_SOURCE##*/} ]; then
+  main "$@"
+else
+  unset main
+fi

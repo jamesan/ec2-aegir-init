@@ -1,8 +1,7 @@
 #!/bin/sh
 #
-#   prov-ec2-01-setup-system
-#   Configure basic server setup for an EC2 instance launched from a base
-#   Arch Linux AMI. Part of the prov-ec2 script series.
+#   01-init-scripts
+#   Initialise scripts and execute them in sequence (run on remote host).
 #
 #   Copyright (c) 2015 James An <james@jamesan.ca>
 #
@@ -19,20 +18,10 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-source /usr/local/bin/utility-library
-tempfile=$(mktemp)
-
-main() {
-  _msg 'Setting hostname...'
-
-  hostnamectl set-hostname $(curl http://169.254.169.254/latest/meta-data/hostname)
-
-  _msg 'Set up complete!'
-}
-
-# invoke main function if this script is executed as a command
-if [ "$CMD" = ${BASH_SOURCE##*/} ]; then
-  main "$@"
-else
-  unset main
-fi
+install -m755 /tmp/utility-library /usr/local/bin
+for file in /tmp/1{1..6}-*; do
+  echo $file
+  chmod +x $file
+  $file
+  rm $file
+done

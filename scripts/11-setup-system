@@ -75,7 +75,7 @@ main() {
   _msg 'Upgrading and installing system packages...'
 
   _msg2 'Installing missing base and base-devel packages and remove multilib gcc...'
-  echo -e '\n\ny\ny\n' | pacman --sync --refresh --sysupgrade --needed base base-devel
+  echo -e '\n\ny\ny\n' | pacman --sync --refresh --sysupgrade --needed --ignore linux base base-devel 
 
   _msg2 'Re-creating pacman keyring...'
   rm -rf /etc/pacman.d/gnupg

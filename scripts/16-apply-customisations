@@ -23,10 +23,10 @@ source /usr/local/bin/utility-library
 tempfile=$(mktemp)
 
 # Declare GitHub-related constants.
-github_user=jamesan
-github_token=14d01e098f86d03f0be049f66196925977aaff9a
-github_repo_api_url=https://api.github.com/repos/dresources/insight-platform
-key_title='R/O password-less key for :ENV: Aegir System User'
+#~ github_user=jamesan
+#~ github_token=14d01e098f86d03f0be049f66196925977aaff9a
+#~ github_repo_api_url=https://api.github.com/repos/dresources/insight-platform
+#~ key_title='R/O password-less key for :ENV: Aegir System User'
 
 # Set DRG-specific Aegir hostmaster variables
 declare -A variables=(
@@ -59,7 +59,7 @@ environment=${environment:-DEV}
 
 main() {
   _msg "Installing phpseclib and enabling OpenSSL PHP extension..."
-  sudo -u user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed pear-phpseclib
+  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed pear-phpseclib
   echo 'extension=openssl.so' >| $tempfile
   install -m644 $tempfile /etc/php/conf.d/openssl.ini
 

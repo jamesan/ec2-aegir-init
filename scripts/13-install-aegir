@@ -33,15 +33,19 @@ main() {
   }
   pacman --sync --refresh
   for PACKAGE in package-query yaourt; do
-    curl --location https://aur4.archlinux.org/cgit/aur.git/snapshot/$PACKAGE.tar.gz | sudo -u user tar --extract --file - --gzip --directory=/tmp
+    curl --location https://aur4.archlinux.org/cgit/aur.git/snapshot/$PACKAGE.tar.gz | sudo -u cloud-user tar --extract --file - --gzip --directory=/tmp
     pushd /tmp/$PACKAGE
-    sudo -u user makepkg --install --syncdeps --noconfirm --needed
+    sudo -u cloud-user makepkg --install --syncdeps --noconfirm --needed
     popd
   done
 
   _msg2 'Installing aegir and mailcatcher...'
-  sudo -u user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed ruby-mailcatcher drush-git
-  sudo -u user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed aegir
+  pacman --noconfirm --sync --needed --asdeps php-composer
+  composer self-update
+  echo 'extension=phar.so' >| /etc/php/conf.d/phar.ini
+  echo 'open_basedir =' >| /etc/php/conf.d/open_basedir.ini
+  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed ruby-mailcatcher drush-git
+  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed aegir
 
   _msg 'Generate per-user MySQL credentials and disable all shell password authentication...'
   [ "$(systemctl is-active mysqld.service)" = 'active' ] && systemctl stop mysqld.service
@@ -54,9 +58,8 @@ main() {
       FILE="${MY_CNF/\%USER\%/$USERNAME}"
       FILE="${FILE/\%PASS\%/$PASSWORD}"
       HOME="$(eval echo ~$USERNAME)"
-      CONF_PATH="$HOME/.my.cnf"
-      install --directory --owner=$USERNAME $HOME
-      echo -e "$FILE" | sudo -u $USERNAME tee $CONF_PATH &>/dev/null
+      echo -e "$FILE" > $tempfile
+      install -D --owner=$USERNAME --group=$(id --group --name $USERNAME) $tempfile $HOME/.my.cnf
       SQL_CMDS+=("GRANT ALL PRIVILEGES ON *.* TO '$USERNAME'@'%' IDENTIFIED BY '$PASSWORD' WITH GRANT OPTION;")
   done
   test -v SQL_CMDS && unset SQL_CMDS[${#SQL_CMDS[@]}-1]
@@ -85,6 +88,7 @@ main() {
 
   _msg2 'Setting up msmtp and mailcatcher as an SMTP server emulator...'
   systemctl enable --now mailcatcher.service mailcatcher-smtp.socket
+  systemctl start nginx.service
   cp --force /etc/msmtprc.aegir /etc/msmtprc
 
   _msg2 'Setting up the Aegir frontend, Hostmaster...'
