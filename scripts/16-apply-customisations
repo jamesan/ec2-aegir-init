@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#   prov-ec2-06-apply-drg-config
+#   16-apply-customisations
 #   Apply configuration settings specific to DRG's Insight Platform project.
 #   Part of the prov-ec2 script series.
 #

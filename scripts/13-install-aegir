@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#   prov-ec2-03-install-lemp-aegir
+#   13-install-aegir
 #   Install LEMP packages and Aegir. Part of the prov-ec2 script series.
 #
 #   Copyright (c) 2015 James An <james@jamesan.ca>

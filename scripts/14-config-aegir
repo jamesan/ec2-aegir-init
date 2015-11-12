@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#   prov-ec2-04-config-aegir
+#   14-config-aegir
 #   Configure Aegir and enable its features. Part of the prov-ec2 script series.
 #
 #   Copyright (c) 2015 James An <james@jamesan.ca>

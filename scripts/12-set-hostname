@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#   prov-ec2-01-setup-system
+#   12-set-hostname
 #   Configure basic server setup for an EC2 instance launched from a base
 #   Arch Linux AMI. Part of the prov-ec2 script series.
 #
