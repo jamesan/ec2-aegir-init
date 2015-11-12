@@ -30,7 +30,7 @@ tempfile=$(mktemp)
 
 # Set DRG-specific Aegir hostmaster variables
 declare -A variables=(
-  ['hosting_default_profile']='insight_install'
+  #~ ['hosting_default_profile']='insight_install'
 )
 
 #

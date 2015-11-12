@@ -44,23 +44,31 @@ main() {
   composer self-update
   echo 'extension=phar.so' >| /etc/php/conf.d/phar.ini
   echo 'open_basedir =' >| /etc/php/conf.d/open_basedir.ini
-  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed ruby-mailcatcher drush-git
-  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed aegir
+  sudo -Hu cloud-user yaourt --noconfirm --sync --needed ruby-mailcatcher drush-git
+  
+  [ -d /etc/drush 
+  find /etc/drush -name '*.alias.drushrc.php' -delete
+  find /usr/share/webapps/hostmaster/sites ~aegir/platforms/*/sites -mindepth 1 -maxdepth 1 -type d -not \( -name default -or -name all \) -exec rm -rf {} +
+  sudo -Hu cloud-user yaourt --noconfirm --sync aegir
 
   _msg 'Generate per-user MySQL credentials and disable all shell password authentication...'
   [ "$(systemctl is-active mysqld.service)" = 'active' ] && systemctl stop mysqld.service
   [ -d /var/lib/mysql ] && rm --force --recursive /var/lib/mysql
   mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql && systemctl start mysqld.service
   SQL_CMDS=()
-  MY_CNF="[client]\nuser=%USER%\npassword=%PASS%"
   for USERNAME in aegir root; do
-      PASSWORD="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)"
-      FILE="${MY_CNF/\%USER\%/$USERNAME}"
-      FILE="${FILE/\%PASS\%/$PASSWORD}"
+      # Create mysql user.
       HOME="$(eval echo ~$USERNAME)"
-      echo -e "$FILE" > $tempfile
-      install -D --owner=$USERNAME --group=$(id --group --name $USERNAME) $tempfile $HOME/.my.cnf
+      FILE="$HOME/.my.cnf"
+      PASSWORD="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
       SQL_CMDS+=("GRANT ALL PRIVILEGES ON *.* TO '$USERNAME'@'%' IDENTIFIED BY '$PASSWORD' WITH GRANT OPTION;")
+      
+      # Save mysql user credentials to user's default mysql config file
+      [ -f $FILE ] && rm $FILE
+      MY_CNF="[client]\nuser=%USER%\npassword=%PASS%"
+      MY_CNF="${MY_CNF/\%USER\%/$USERNAME}"
+      echo -e "${MY_CNF/\%PASS\%/$PASSWORD}" > $tempfile
+      install -D --owner=$USERNAME --group=$(id --group --name $USERNAME) $tempfile $FILE
   done
   test -v SQL_CMDS && unset SQL_CMDS[${#SQL_CMDS[@]}-1]
   SQL_CMDS+=(
@@ -71,20 +79,19 @@ main() {
       "DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';"
       "FLUSH PRIVILEGES;"
   )
-  mv /root/.my.cnf{,~}
-  mysql --user=root --execute="${SQL_CMDS[*]}"
-  mv /root/.my.cnf{~,}
+  mv ~root/.my.cnf{,~}
+  mysql --execute="${SQL_CMDS[*]}"
+  mv ~root/.my.cnf{~,}
 
   _msg 'Setting up LEMP stack as dedicated Drupal host and Aegir controller'
-
   _msg2 'Applying ACL onto Aegir files and folders...'
   paths=(
     /etc/drush
     /usr/share/webapps/aegir
     /usr/share/webapps/hostmaster
   )
-  sudo setfacl --recursive --modify=g:http:rw- "${paths[@]}"
-  sudo find "${paths[@]}" -type d -exec sudo setfacl --modify=g:http:rwx {} +
+  setfacl --recursive --modify=g:http:rw- "${paths[@]}"
+  find "${paths[@]}" -type d -exec sudo setfacl --modify=g:http:rwx {} +
 
   _msg2 'Setting up msmtp and mailcatcher as an SMTP server emulator...'
   systemctl enable --now mailcatcher.service mailcatcher-smtp.socket
@@ -94,12 +101,12 @@ main() {
   _msg2 'Setting up the Aegir frontend, Hostmaster...'
   sudo -Hu aegir drush hostmaster-install --web_group=http --http_service_type=nginx \
         --root=/usr/share/webapps/hostmaster \
-        --aegir_db_user=$(sudo -u aegir sed --quiet --regexp-extended 's/^user=(.+)$/\1/p' ~aegir/.my.cnf) \
-        --aegir_db_pass="$(sudo -u aegir sed --quiet --regexp-extended 's/^password=(.+)$/\1/p' ~aegir/.my.cnf)" \
+        --aegir_db_user=$(sudo -Hu aegir sed --quiet --regexp-extended 's/^user=(.+)$/\1/p' ~aegir/.my.cnf) \
+        --aegir_db_pass="$(sudo -Hu aegir sed --quiet --regexp-extended 's/^password=(.+)$/\1/p' ~aegir/.my.cnf)" \
         --client_email=aegir@$(hostname) \
         --aegir_host=$(hostname) aegir.$(hostname) \
         --yes
-  sudo systemctl enable --now aegir.target
+  systemctl enable --now aegir.target
 
   _msg 'Set up complete!'
 }

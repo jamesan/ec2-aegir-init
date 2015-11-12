@@ -188,14 +188,16 @@ main() {
   
   _msg "Installing Drupal distributions as Aegir platforms..."
   for platform in drupal drupal-8; do
-    sudo -u aegir drush dl $platform --destination=/usr/share/webapps/aegir/platforms
+    sudo -u aegir drush dl $platform --destination=/usr/share/webapps/aegir/platforms --yes
   done
   for platform in $(find /usr/share/webapps/aegir/platforms -maxdepth 1 -mindepth 1 -type d -printf "%f\n"); do
-    alias=@platform_$(echo ${platform^} | tr -d '.-')
+    alias=@platform_$(echo ${platform^} | sed 's/[.-]//g')
     sudo -u aegir drush --root=/usr/share/webapps/aegir/platforms/$platform provision-save $alias --context_type='platform' --yes
     sudo -u aegir drush $alias provision-verify
     sudo -u aegir drush @hostmaster hosting-import $alias
   done
+  
+  systemctl restart aegir.service aegir.target mysqld.service nginx.service php-fpm.service
   _msg 'Set up complete!'
 }
 
