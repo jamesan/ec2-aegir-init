@@ -45,14 +45,13 @@ main() {
   echo 'extension=phar.so' >| /etc/php/conf.d/phar.ini
   echo 'open_basedir =' >| /etc/php/conf.d/open_basedir.ini
   sudo -Hu cloud-user yaourt --noconfirm --sync --needed ruby-mailcatcher drush-git
-  
-  [ -d /etc/drush 
   find /etc/drush -name '*.alias.drushrc.php' -delete
   find /usr/share/webapps/hostmaster/sites ~aegir/platforms/*/sites -mindepth 1 -maxdepth 1 -type d -not \( -name default -or -name all \) -exec rm -rf {} +
   sudo -Hu cloud-user yaourt --noconfirm --sync aegir
 
   _msg 'Generate per-user MySQL credentials and disable all shell password authentication...'
   [ "$(systemctl is-active mysqld.service)" = 'active' ] && systemctl stop mysqld.service
+  sleep 3 && pkill mysqld
   [ -d /var/lib/mysql ] && rm --force --recursive /var/lib/mysql
   mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql && systemctl start mysqld.service
   SQL_CMDS=()
