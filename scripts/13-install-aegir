@@ -62,7 +62,7 @@ main() {
       FILE="$HOME/.my.cnf"
       PASSWORD="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
       SQL_CMDS+=("GRANT ALL PRIVILEGES ON *.* TO '$USERNAME'@'%' IDENTIFIED BY '$PASSWORD' WITH GRANT OPTION;")
-      
+
       # Save mysql user credentials to user's default mysql config file
       [ -f $FILE ] && rm $FILE
       MY_CNF="[client]\nuser=%USER%\npassword=%PASS%"

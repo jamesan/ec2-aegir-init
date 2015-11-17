@@ -21,7 +21,7 @@
 
 source /usr/local/bin/utility-library
 tempfile=$(mktemp)
-hostname=$(curl http://169.254.169.254/latest/user-data | egrep '^hostname=' | cut -f2- -d=)
+hostname=$(curl http://169.254.169.254/latest/user-data | egrep '^HOSTNAME=' | cut -f2- -d=)
 
 main() {
   _msg 'Setting hostname...'

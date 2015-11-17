@@ -30,7 +30,7 @@ main() {
   grep -v ^$hostname ~/.ssh/known_hosts | sponge ~/.ssh/known_hosts
   ssh-keyscan $hostname >> ~/.ssh/known_hosts
   ssh root@$hostname exit &>/dev/null
-  
+
   if [ $? -eq 0 ]; then
     USER=root
     SUDO=
