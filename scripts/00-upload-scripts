@@ -22,6 +22,7 @@
 source /usr/local/bin/utility-library
 tempfile=$(mktemp)
 hostname=$1
+scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 main() {
   _msg 'Running provision scripts...'
@@ -39,7 +40,7 @@ main() {
     SUDO=sudo
   fi
   ssh $USER@$hostname $SUDO rm /tmp/1* /tmp/utility-library
-  scp 1{0..6}-* utility-library $USER@$hostname:/tmp
+  scp $scriptdir/{1{0..6}-*,utility-library} $USER@$hostname:/tmp
   ssh $USER@$hostname $SUDO sh /tmp/10-init-scripts
 
   _msg 'Set up complete!'
