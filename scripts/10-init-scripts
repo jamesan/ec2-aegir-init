@@ -23,5 +23,5 @@ for file in /tmp/1{1..6}-*; do
   echo $file
   chmod +x $file
   $file
-  rm --force --verbose $file
+  rm --force $file
 done
