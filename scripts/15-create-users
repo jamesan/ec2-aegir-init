@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#   prov-ec2-05-create-users
+#   15-create-users
 #   Create shell users and fetch their SSH public keys from GitHub. Part of
 #   the prov-ec2 script series.
 #

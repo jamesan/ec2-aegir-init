@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#   run-prov-scripts-at
+#   00-upload-scripts
 #   Upload, install, and execute provision script series given the
 #   IP address or FQDN of an EC2 instance.
 #

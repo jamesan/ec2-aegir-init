@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-#   01-init-scripts
+#   10-init-scripts
 #   Initialise scripts and execute them in sequence (run on remote host).
 #
 #   Copyright (c) 2015 James An <james@jamesan.ca>
