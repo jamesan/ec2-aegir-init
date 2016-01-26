@@ -26,6 +26,9 @@ main() {
 
   _msg2 'Installing LEMP stack packages...'
   pacman --noconfirm --sync --needed mariadb nginx php-fpm
+  pacman --noconfirm --sync --needed --asdeps php-composer
+  #~ echo 'extension=phar.so' >| /etc/php/conf.d/phar.ini
+  composer self-update
 
   _msg2 'Installing TU repo and AUR helpers...'
   [ -z "$(grep quarry /etc/pacman.conf)" ] && {
@@ -40,10 +43,6 @@ main() {
   done
 
   _msg2 'Installing aegir and mailcatcher...'
-  pacman --noconfirm --sync --needed --asdeps php-composer
-  composer self-update
-  echo 'extension=phar.so' >| /etc/php/conf.d/phar.ini
-  echo 'open_basedir =' >| /etc/php/conf.d/open_basedir.ini
   sudo -Hu cloud-user yaourt --noconfirm --sync --needed ruby-mailcatcher drush-git
   find /etc/drush -name '*.alias.drushrc.php' -delete
   find /usr/share/webapps/hostmaster/sites ~aegir/platforms/*/sites -mindepth 1 -maxdepth 1 -type d -not \( -name default -or -name all \) -exec rm -rf {} +
