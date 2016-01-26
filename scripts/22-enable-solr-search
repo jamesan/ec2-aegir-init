@@ -1,0 +1,80 @@
+#!/bin/sh
+#
+#   22-enable-solr-search
+#
+#   Copyright (c) 2015 James An <james@jamesan.ca>
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+source /usr/local/bin/utility-library
+tempfile=$(mktemp)
+hostname=$1
+scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+install_solr() {
+  _msg 'Installing and enabling Solr.'
+
+  _msg2 'Installing solr-related AUR packages: solr-conf-drupal, solr-undertow, and solr5-zip:'
+  yaourt --sync --needed --noconfirm solr-conf-drupal solr-undertow solr5-zip
+  sed --in-place --regexp-extended 's/^\s*(solrWarFile:).*$/  solrWarFile: /usr/share/java/lib/solr/solr-${solr.undertow.solrVersion}.zip/' /etc/solr/default.conf
+  if ! systemctl --system --quiet is-active solr-undertow.service; then
+    systemctl --system enable --now solr-undertow.service
+  fi
+
+  _msg2 'Creating solr core with site drush alias.'
+  drupal_version="$(drush @$hostname status --no-field-labels --pipe | grep drupal-version | cut -f4 -d\")"
+  curl "http://localhost:8983/solr/admin/cores?action=CREATE&name=$hostname&configSet=solr-5.x-drupal-${drupal_version%%.*}.x"
+
+  _msg 'Installing Drupal extensions: search_api and search_api_solr'
+  drush @$hostname --yes pm-enable search_api search_api_solr
+  drush @$hostname cache-clear drush
+  drush @$hostname entity-create search_api_server --json <<-EOF
+  {
+    "name": "Solr Server",
+    "machine_name": "solr_server",
+    "description": "",
+    "class": "search_api_solr_service",
+    "options": {
+      "clean_ids": true,
+      "site_hash": true,
+      "scheme": "http",
+      "host": "$hostname",
+      "port": "8983",
+      "path": "\/solr\/$hostname",
+      "http_user": "",
+      "http_pass": "",
+      "excerpt": 0,
+      "retrieve_data": 0,
+      "highlight_data": 0,
+      "skip_schema_check": 0,
+      "solr_version": "5",
+      "http_method": "GET"
+    }
+  }
+EOF
+
+update_host_ip_addr() {
+  sudo sed -r -i "s/^\s*[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\s+([-_\.\*a-zA-Z0-9]*$hostname)\$/$ip_addr \1/" /etc/hosts
+}
+
+main() {
+  install_solr
+}
+
+# invoke main function if this script is executed as a command
+if [ "$CMD" = ${BASH_SOURCE##*/} ]; then
+  main "$@"
+else
+  unset main
+fi
