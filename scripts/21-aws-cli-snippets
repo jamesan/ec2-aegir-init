@@ -23,7 +23,7 @@ hostname=$1
 scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 get_instance_ip_addr() {
-  echo $(aws ec2 describe-instances --instance-ids $instance-id | jq '.Reservations[0].Instances[0].PublicIpAddress' | tr -d '"')
+  echo $(aws ec2 describe-instances --instance-ids $instance_id | jq '.Reservations[0].Instances[0].PublicIpAddress' | tr -d '"')
 }
 
 update_host_ip_addr() {

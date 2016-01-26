@@ -31,7 +31,7 @@ main() {
   [ -z "$(grep quarry /etc/pacman.conf)" ] && {
     sed --in-place '/\[core\]/i\[quarry]\nServer = http://pkgbuild.com/~anatolik/quarry/x86_64\n' /etc/pacman.conf
   }
-  pacman --sync --refresh
+  pacman --sync --refresh --sysupgrade
   for PACKAGE in package-query yaourt; do
     curl --location https://aur4.archlinux.org/cgit/aur.git/snapshot/$PACKAGE.tar.gz | sudo -u cloud-user tar --extract --file - --gzip --directory=/tmp
     pushd /tmp/$PACKAGE
@@ -66,7 +66,7 @@ main() {
       [ -f $FILE ] && rm $FILE
       MY_CNF="[client]\nuser=%USER%\npassword=%PASS%"
       MY_CNF="${MY_CNF/\%USER\%/$USERNAME}"
-      echo -e "${MY_CNF/\%PASS\%/$PASSWORD}" > $tempfile
+      echo -e "${MY_CNF/\%PASS\%/$PASSWORD}" >| $tempfile
       install -D --owner=$USERNAME --group=$(id --group --name $USERNAME) $tempfile $FILE
   done
   test -v SQL_CMDS && unset SQL_CMDS[${#SQL_CMDS[@]}-1]
@@ -95,7 +95,7 @@ main() {
   _msg2 'Setting up msmtp and mailcatcher as an SMTP server emulator...'
   systemctl enable --now mailcatcher.service mailcatcher-smtp.socket
   systemctl start nginx.service
-  cp --force /etc/msmtprc.aegir /etc/msmtprc
+  yes | cp --force /etc/msmtprc.aegir /etc/msmtprc
 
   _msg2 'Setting up the Aegir frontend, Hostmaster...'
   sudo -Hu aegir drush hostmaster-install --web_group=http --http_service_type=nginx \
