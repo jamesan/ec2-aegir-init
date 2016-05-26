@@ -4,22 +4,20 @@
 tempfile=$(mktemp)
 
 # Constants.
-image_id='ami-fdce32b9' # us-west-1
-image_id='ami-572c883c' # us-east-1
+image_id='ami-d39fedb3' # us-west-1
 instance_type='m3.xlarge'
-token_prefix='insight-create-us-e1a-'
-token_counter=03
-tag_prefix='insight-'
-tag_suffix='-us-e1a'
+token_prefix='jamesan-create-us-w1c-'
+token_counter=01
+tag_prefix='jamesan'
+tag_suffix='us-w1c'
 vpc_cidr='192.168.255.240/28'
 environment='dev'
-availability_zone='us-east-1a'
+availability_zone='us-west-1c'
 
 # Source IP addresses for firewall whitelist.
 ip_addrs=(
-  [toronto]=38.99.136.166
-  [bangalore]=0.0.0.0
-  [james]=0.0.0.0
+  [james]=174.88.99.177
+)
 
 # Resource name tag nomenclature.
 declare -A tags=(
@@ -47,9 +45,9 @@ declare -A ids=(
   [security-group]=sg-a3c2d9c7
 )
 declare -A names=(
-  [image]='arch-linux-hvm-2015.07.30.x86_64-ebs'
-  [key]="${tag_prefiX}key-jan${tag_suffix}"
-  [instance]="${tag_prefiX}instance-$token_counter${tag_suffix}"
+  [image]='arch-linux-hvm-2016.03.21.x86_64-ebs'
+  [key]="${tag_prefix}-key-jan-${tag_suffix}"
+  [instance]="${tag_prefix}-instance-$token_counter-${tag_suffix}"
 )
 declare -A id_names=(
   [image]=ImageId
@@ -73,36 +71,63 @@ function create_aws_resources() {
 
   case "$1" in
     key) # Import root key.
-      aws ec2 import-key-pair --cli-input-json '{
-        "DryRun": true,
-        "KeyName": "'${ids[key]}'",
-        "PublicKeyMaterial": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwczn2Gd/E9ecQfpaL1SCjk3VsMtSePx7dvmcoko1D8G0N6otVRt9BWDK6oDm3r1oGdPhWfvuCMIrJDA+YjJWVLhztG/Kxm7Hv227Z8H4LznSQmaR1RlkBHFjNMcLn2EZ+PpxThKpteO8CLAkIUHUYYEAgBFsmuxiS6UCKeBq6S5lS2m67RbU4QKf97IPql98iW5sKqytUER+ooH7qxV6Mzzj3ye94JMIKCGIYgKEX23g2o14lyzedhblTdlpUQRGRqqRIqumWkiyXQaJejvSh53kBbIjZ+Wgl7ZqNaRMnTii5ZHHb5OcfSBPXnwh7QkvTJMBNqtwHiVgCW31vTVa0wIDAQAB"
+      aws ec2 describe-key-pairs --cli-input-json '{
+        "KeyNames": [
+          "'${names[key]}'"
+        ]
       }' >| $tempfile
-      ids[key]="$(get_value KeyName)"
+      if [ $? -ne 0 ]; then
+        aws ec2 import-key-pair --cli-input-json '{
+          "KeyName": "'${names[key]}'",
+          "PublicKeyMaterial": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwczn2Gd/E9ecQfpaL1SCjk3VsMtSePx7dvmcoko1D8G0N6otVRt9BWDK6oDm3r1oGdPhWfvuCMIrJDA+YjJWVLhztG/Kxm7Hv227Z8H4LznSQmaR1RlkBHFjNMcLn2EZ+PpxThKpteO8CLAkIUHUYYEAgBFsmuxiS6UCKeBq6S5lS2m67RbU4QKf97IPql98iW5sKqytUER+ooH7qxV6Mzzj3ye94JMIKCGIYgKEX23g2o14lyzedhblTdlpUQRGRqqRIqumWkiyXQaJejvSh53kBbIjZ+Wgl7ZqNaRMnTii5ZHHb5OcfSBPXnwh7QkvTJMBNqtwHiVgCW31vTVa0wIDAQAB"
+        }' >| $tempfile
+      fi
+      names[key]="$(get_value KeyName)"
       ;&
 
     dhcp-options) # Create DHCP option set.
-      aws ec2 create-dhcp-options --cli-input-json '{
-        "DhcpConfigurations": [
+
+      aws ec2 describe-dhcp-options --cli-input-json '{
+        "Filters": [
           {
-            "Key": "domain-name",
+            "Name": "tag:domain-name",
             "Values": [
               "ec2.internal"
             ]
-          },
-          {
-            "Key": "domain-name-servers",
-            "Values": [
-              "AmazonProvidedDNS"
-            ]
           }
         ]
+
       }' >| $tempfile
+      if [ $? -ne 0 ]; then
+        aws ec2 create-dhcp-options --cli-input-json '{
+          "DhcpConfigurations": [
+            {
+              "Key": "domain-name",
+              "Values": [
+                "ec2.internal"
+              ]
+            },
+            {
+              "Key": "domain-name-servers",
+              "Values": [
+                "AmazonProvidedDNS"
+              ]
+            }
+          ]
+        }' >| $tempfile
+      fi
       ids[dhcp-options]="$(get_value DhcpOptionsId)"
+      ;&
 
     vpc) # Create virtual private cloud (VPC).
+      aws ec2 describe-vpcs --cli-input-json '{
+      }' >| $tempfile
       aws ec2 create-vpc --cli-input-json '{
-        "DryRun": true,
+        "CidrBlock": "'$vpc_cidr'",
+        "InstanceTenancy": "default"
+      }' >| $tempfile
+      ids[vpc]="$(get_value VpcId)"
+      aws ec2 create-vpc --cli-input-json '{
         "CidrBlock": "'$vpc_cidr'",
         "InstanceTenancy": "default"
       }' >| $tempfile
@@ -110,14 +135,12 @@ function create_aws_resources() {
 
       # Enable DNS hostnames for the VPC.
       aws ec2 modify-vpc-attribute --cli-input-json '{
-        "DryRun": true,
         "VpcId": "'${ids[vpc]}'",
         "EnableDnsSupport": {
           "Value": true
         }
       }'
       aws ec2 modify-vpc-attribute --cli-input-json '{
-        "DryRun": true,
         "VpcId": "'${ids[vpc]}'",
         "EnableDnsHostnames": {
           "Value": true
@@ -127,7 +150,6 @@ function create_aws_resources() {
 
     subnet) # Create subnet within intended availability zone.
       aws ec2 create-subnet --cli-input-json '{
-        "DryRun": true,
         "VpcId": "'${ids[vpc]}'",
         "CidrBlock": "'$vpc_cidr'",
         "AvailabilityZone": "us-west-1a"
@@ -137,8 +159,7 @@ function create_aws_resources() {
 
     group) # Create security group.
       aws ec2 create-security-group --cli-input-json '{
-        "DryRun": true,
-        "GroupName": "'$tag_prefix'sg'$tag_suffix'",
+        "GroupName": "'$tag_prefix-'sg'-$tag_suffix'",
         "Description": "Insight Platform Group for us-e1a ",
         "VpcId": "'${ids[vpc]}'"
       }' >| $tempfile
@@ -146,7 +167,6 @@ function create_aws_resources() {
 
       # Add ingress rules to security group.
       aws ec2 authorize-security-group-ingress --cli-input-json '{
-        "DryRun": true,
         "GroupId": "'${ids[security-group]}'",
         "IpProtocol": "tcp",
         "FromPort": 80,
@@ -156,7 +176,6 @@ function create_aws_resources() {
       for ip_addr in "${ip_addrs[@]}"; do
         [ $ip_addr = 0.0.0.0 ] && continue
         aws ec2 authorize-security-group-ingress --cli-input-json '{
-          "DryRun": true,
           "GroupId": "'${ids[security-group]}'",
           "IpProtocol": "-1",
           "CidrIp": "'$ip_addr'/32"
@@ -167,11 +186,10 @@ function create_aws_resources() {
 
     instance) # Launch EC2 instance with above-instantiated resources.
       aws ec2 run-instances --cli-input-json '{
-        "DryRun": true,
         "ImageId": "'$ids[image]'",
         "MinCount": 1,
         "MaxCount": 1,
-        "KeyName": "'$tag_prefix$instance_name$tag_suffix'",
+        "KeyName": "'$tag_prefix-$instance_name-$tag_suffix'",
         "SecurityGroupIds": [
           "'${ids[security-group]}'"
         ],
@@ -199,7 +217,7 @@ hostnamectl set-location '"'"'AWS: '$availability_zone"'"'",
         "SubnetId": "'${ids[subnet]}'",
         "DisableApiTermination": false,
         "InstanceInitiatedShutdownBehavior": "stop",
-        "ClientToken": "'$tag_prefix'token-'$token_counter$tag_suffix'",
+        "ClientToken": "'$tag_prefix-'token-'$token_counter-$tag_suffix'",
         "NetworkInterfaces": [
           {
             "DeviceIndex": 0,
@@ -231,7 +249,7 @@ hostnamectl set-location '"'"'AWS: '$availability_zone"'"'",
           "Tags": [
             {
               "Key": "Name",
-              "Value": "'$tag_prefix${tags_id[$resource_id]}$tag_suffix'"
+              "Value": "'$tag_prefix-${tags_id[$resource_id]}-$tag_suffix'"
             }
           ]
         }'
@@ -252,7 +270,7 @@ for type in "${resource_types[@]}"; do
   echo $type
   [ -v names[$type] ] \
     && name="${names[$type]}" \
-    || name="${tag_prefix}${type}${tag_suffix}"
+    || name="${tag_prefix}-${type}-${tag_suffix}"
   command="describe-${type}s"
   command="${command/ss/s}"
   aws ec2 $command --filter Name=tag:Name,Values=$name >| $tempfile \
@@ -261,21 +279,21 @@ for type in "${resource_types[@]}"; do
   echo "$type-id = ${ids[$type]}"
 done
 
-#~ aws ec2 describe-dhcp-options --filter Name=tag:Name,Values=${names[dhcp-options]} >| $tempfile \
-  #~ && dhcp_options_id="$(get_value DhcpOptionsId)" \
-  #~ || create_aws_resources dhcp-options
-#~ aws ec2 describe-vpcs --filter Name=tag:Name,Values=${names[vpc]} >| $tempfile \
-  #~ && vpc_id="$(get_value VpcId)" \
-  #~ || create_aws_resources vpc{ vpc_id="$(get_value VpcId)";
-#~ aws ec2 describe-subnets --filter Name=tag:Name,Values=${names[subnet]} >| $tempfile \
-  #~ && subnet_id="$(get_value SubnetId)" \
-  #~ || create_aws_resources subnet
-#~ aws ec2 describe-security-groups --filter Name=tag:Name,Values=${names[security-group]} >| $tempfile \
-  #~ && group_id="$(get_value GroupId)" \
-  #~ || create_aws_resources security-group
-#~ aws ec2 describe-instances --filter Name=tag:Name,Values=${names[instance]} >| $tempfile \
-  #~ && instance_id="$(get_value InstanceId)" \
-  #~ || create_aws_resources instance
+aws ec2 describe-dhcp-options --filter Name=tag:Name,Values=${names[dhcp-options]} >| $tempfile \
+  && dhcp_options_id="$(get_value DhcpOptionsId)" \
+  || create_aws_resources dhcp-options
+aws ec2 describe-vpcs --filter Name=tag:Name,Values=${names[vpc]} >| $tempfile \
+  && vpc_id="$(get_value VpcId)" \
+  || create_aws_resources vpc{ vpc_id="$(get_value VpcId)";
+aws ec2 describe-subnets --filter Name=tag:Name,Values=${names[subnet]} >| $tempfile \
+  && subnet_id="$(get_value SubnetId)" \
+  || create_aws_resources subnet
+aws ec2 describe-security-groups --filter Name=tag:Name,Values=${names[security-group]} >| $tempfile \
+  && group_id="$(get_value GroupId)" \
+  || create_aws_resources security-group
+aws ec2 describe-instances --filter Name=tag:Name,Values=${names[instance]} >| $tempfile \
+  && instance_id="$(get_value InstanceId)" \
+  || create_aws_resources instance
 
 ##
 # Get instance SSH host keys
