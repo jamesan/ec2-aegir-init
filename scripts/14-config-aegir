@@ -81,8 +81,8 @@ declare -A variables=(
   [hosting_delete_backups]='always'
   [hosting_ignore_default_profiles]=1
   [hosting_lock_platforms_by_default]=1
-  [hosting_platform_base_path]='/usr/share/webapps/aegir/platforms/'
-  [hosting_platform_pathauto_base_path]='/usr/share/webapps/aegir/platforms/'
+  [hosting_platform_base_path]='/var/lib/aegir/platforms/'
+  [hosting_platform_pathauto_base_path]='/var/lib/aegir/platforms/'
   [hosting_queue_task_gc_enabled]=1
   [hosting_queue_task_gc_frequency]='3600'
   [hosting_require_disable_before_delete]=0
@@ -182,24 +182,24 @@ main() {
 
   _msg "Installing additional contrib modules to the Hostmaster site..."
   sudo -Hu aegir drush @hostmaster dl --yes "${modules_dl[@]}" "${modules[@]}"
-  sudo -Hu aegir drush dl --yes --default-major=6 "${modules_6_x[@]}" --destination="$(sudo -Hu aegir drush @hostmaster drupal-directory)/sites/all/modules"
+  #~ sudo -Hu aegir drush dl --yes --default-major=6 "${modules_6_x[@]}" --destination="$(sudo -Hu aegir drush @hostmaster drupal-directory)/sites/all/modules"
   egrep -rIl '^\s*core\s*=\s*"?6.x"?\s*$' "$(drush @hm \dd)/sites" | xargs sudo sed -r -i 's#^\s*core\s*=\s*"?6.x"?\s*$#core = 7.x#'
-  sudo -Hu aegir drush @hostmaster en --yes "${modules[@]}" "${modules_6_x[@]}" "${modules_en[@]}"
+  sudo -Hu aegir drush @hostmaster en --yes "${modules[@]}" "${modules_en[@]}"
 
-  _msg "Installing Drupal distributions as Aegir platforms..."
-  for platform in drupal-7 drupal-8; do
-    sudo -u aegir drush dl $platform --destination=/usr/share/webapps/aegir/platforms --yes
-  done
-  for platform in $(find /usr/share/webapps/aegir/platforms -maxdepth 1 -mindepth 1 -type d -printf "%f\n"); do
-    alias=@platform_$(echo ${platform^} | sed 's/[.-]//g')
-    sudo -u aegir drush --root=/usr/share/webapps/aegir/platforms/$platform provision-save $alias --context_type='platform' --yes
-    sudo -u aegir drush $alias provision-verify
-    sudo -u aegir drush @hostmaster hosting-import $alias
-    sudo -u aegir drush @hostmaster hosting-task $alias verify
-    sudo -u aegir drush @hostmaster hosting-task $alias unlock
-  done
+  #~ _msg "Installing Drupal distributions as Aegir platforms..."
+  #~ for platform in drupal-7 drupal-8; do
+    #~ sudo -u aegir drush dl $platform --destination=/var/lib/aegir/platforms --yes
+  #~ done
+  #~ for platform in $(find /var/lib/aegir/platforms -maxdepth 1 -mindepth 1 -type d -printf "%f\n"); do
+    #~ alias=@platform_$(echo ${platform^} | sed 's/[.-]//g')
+    #~ sudo -u aegir drush --root=/var/lib/aegir/platforms/$platform provision-save $alias --context_type='platform' --yes
+    #~ sudo -u aegir drush $alias provision-verify
+    #~ sudo -u aegir drush @hostmaster hosting-import $alias
+    #~ sudo -u aegir drush @hostmaster hosting-task $alias verify
+    #~ sudo -u aegir drush @hostmaster hosting-task $alias unlock
+  #~ done
 
-  systemctl restart aegir.service aegir.target mysqld.service nginx.service php-fpm.service
+  systemctl restart aegir.service aegir.target mysqld.service nginx.service php56-fpm.service
   _msg 'Set up complete!'
 }
 

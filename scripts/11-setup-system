@@ -27,23 +27,26 @@ main() {
 
   _msg2 'Setting up user skeleton directory with GnuPG and SSH...'
   truncate --size=0 "$tempfile"
-  install --mode=644 -D   /usr/share/doc/gnupg/examples/gpgconf.conf /etc/gnupg/gpgconf.conf
-  install --mode=700 --directory /etc/skel/.gnupg
-  install --mode=700 --directory /etc/skel/.ssh
-  install --mode=600 -D   /usr/share/gnupg/gpg-conf.skel /etc/skel/.gnupg/gpg.conf
-  install --mode=600 "$tempfile" /etc/skel/.gnupg/gpg-agent.conf
-  install --mode=600 "$tempfile" /etc/skel/.gnupg/pubring.gpg
-  install --mode=600 "$tempfile" /etc/skel/.gnupg/secring.gpg
-  install --mode=600 "$tempfile" /etc/skel/.ssh/authorized_keys
-  install --mode=600 "$tempfile" /etc/skel/.ssh/known_hosts
+  [ -f /etc/gnupg/gpgconf.conf ] || install --mode=644 -D /usr/share/doc/gnupg/examples/gpgconf.conf /etc/gnupg/gpgconf.conf
+  if [ ! -d /etc/skel/.gnupg -o ! -d /etc/skel/.ssh ]; then
+    install --mode=700 --directory /etc/skel/.gnupg
+    install --mode=700 --directory /etc/skel/.ssh
+    install --mode=600 -D /usr/share/gnupg/gpg-conf.skel /etc/skel/.gnupg/gpg.conf
+    install --mode=600 "$tempfile" /etc/skel/.gnupg/gpg-agent.conf
+    install --mode=600 "$tempfile" /etc/skel/.gnupg/pubring.gpg
+    install --mode=600 "$tempfile" /etc/skel/.gnupg/secring.gpg
+    install --mode=600 "$tempfile" /etc/skel/.ssh/authorized_keys
+    install --mode=600 "$tempfile" /etc/skel/.ssh/known_hosts
+  fi
 
   _msg2 'Creating remote-accessible non-root user...'
-  echo 'cloud-user ALL=(ALL) NOPASSWD: ALL' >| $tempfile
+
   [ -z $(getent passwd cloud-user) ] && {
     useradd --create-home --no-user-group --gid users cloud-user
+    install --mode=600 -D --owner=cloud-user --group=users /root/.ssh/authorized_keys ~cloud-user/.ssh/authorized_keys
+    echo 'cloud-user ALL=(ALL) NOPASSWD: ALL' >| $tempfile
+    install --mode=440 $tempfile /etc/sudoers.d/cloud-user
   }
-  install --mode=600 -D --owner=cloud-user --group=users /root/.ssh/authorized_keys ~cloud-user/.ssh/authorized_keys
-  install --mode=440 $tempfile /etc/sudoers.d/cloud-user
 
   _msg2 'Securing and enabling SSH daemon...'
   [ -d /root/.ssh ] && {
@@ -75,7 +78,7 @@ main() {
   _msg 'Upgrading and installing system packages...'
 
   _msg2 'Installing missing base and base-devel packages and remove multilib gcc...'
-  echo -e '\n\ny\ny\n' | pacman --sync --refresh --sysupgrade --needed --ignore linux base base-devel 
+  echo -e '\n\ny\ny\n' | pacman --sync --refresh --sysupgrade --needed --ignore linux base base-devel
 
   _msg2 'Re-creating pacman keyring...'
   rm -rf /etc/pacman.d/gnupg
@@ -90,7 +93,7 @@ main() {
   pacman-key --lsign-key 001BED01 A7B30DB9
 
   _msg2 'Installing additional system utilities, removing all 32-bit packages...'
-  yes | pacman --sync --needed bash-completion byobu gcc gcc-libs git jq libpwquality mlocate moreutils rsync unzip wget zip
+  yes | pacman --sync --needed bash-completion gcc gcc-libs git jq libpwquality mlocate moreutils jq rsync sudo unzip wget zip
   pacman --query --quiet --search 32 | xargs pacman --noconfirm --remove --nosave --recursive linux
 
   _msg 'Set up complete!'

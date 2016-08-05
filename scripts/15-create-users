@@ -24,14 +24,6 @@ tempfile=$(mktemp)
 
 declare -A users=(
   [jan]=jamesan
-  #~ [uur-rehman]=ubaidsid
-  #~ [ehan]=ehan-dresources
-  #~ [omanzoor-mir]=mirowais
-  #~ [bthiyagarajan]=bala-drg
-  #~ [rchadha]=rchadha
-  #~ [sprabhu]=sreedhar-drg
-  #~ [vthakur]=vivekthakur-drg
-  #~ [vbhatia]=zorbathebuddha
 )
 
 main() {

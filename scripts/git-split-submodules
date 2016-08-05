@@ -1,6 +1,6 @@
 #!/bin/sh
 
-path_repo=/usr/share/webapps/aegir/platforms/insight_platform_test
+path_repo=/var/lib/aegir/platforms/insight_platform_test
 path_temp=$(mktemp -d)
 
 declare extensions=(

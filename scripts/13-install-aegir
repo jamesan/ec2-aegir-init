@@ -26,7 +26,7 @@ main() {
 
   _msg2 'Installing LEMP stack packages...'
   pacman --noconfirm --sync --needed mariadb nginx php-fpm
-  pacman --noconfirm --sync --needed --asdeps php-composer
+  pacman --noconfirm --sync --needed --asdeps composer
   #~ echo 'extension=phar.so' >| /etc/php/conf.d/phar.ini
   composer self-update
 
@@ -34,25 +34,39 @@ main() {
   [ -z "$(grep quarry /etc/pacman.conf)" ] && {
     sed --in-place '/\[core\]/i\[quarry]\nServer = http://pkgbuild.com/~anatolik/quarry/x86_64\n' /etc/pacman.conf
   }
-  pacman --sync --refresh --sysupgrade
+  pacman --sync --refresh --sysupgrade --noconfirm
   for PACKAGE in package-query yaourt; do
-    curl --location https://aur4.archlinux.org/cgit/aur.git/snapshot/$PACKAGE.tar.gz | sudo -u cloud-user tar --extract --file - --gzip --directory=/tmp
+    if pacman -Qi $PACKAGE &>/dev/null; then
+      continue
+    fi
+    curl --location https://aur.archlinux.org/cgit/aur.git/snapshot/$PACKAGE.tar.gz | sudo -Hu cloud-user tar --extract --file - --gzip --directory=/tmp
     pushd /tmp/$PACKAGE
-    sudo -u cloud-user makepkg --install --syncdeps --noconfirm --needed
+    sudo -Hu cloud-user makepkg --install --syncdeps --noconfirm --needed
     popd
   done
 
-  _msg2 'Installing aegir and mailcatcher...'
-  sudo -Hu cloud-user yaourt --noconfirm --sync --needed ruby-mailcatcher drush-git
+  _msg2 'Installing drush, php 5.6, and byobu...'
+  sudo -Hu cloud-user gpg --recv-keys 293D771241515FE8
+  sudo -Hu cloud-user gpg --lsign-key 293D771241515FE8
+  sudo -Hu cloud-user gpg --recv-keys C2BF0BC433CFC8B3
+  sudo -Hu cloud-user gpg --lsign-key C2BF0BC433CFC8B3
+  sudo -Hu cloud-user yaourt --noconfirm --sync --needed byobu drush-git php56-fpm php56-gd
+
+  _msg2 'Installing aegir...'
   find /etc/drush -name '*.alias.drushrc.php' -delete
   find /usr/share/webapps/hostmaster/sites ~aegir/platforms/*/sites -mindepth 1 -maxdepth 1 -type d -not \( -name default -or -name all \) -exec rm -rf {} +
   sudo -Hu cloud-user yaourt --noconfirm --sync aegir
+
+  _msg2 'Setting up msmtp and mailcatcher as an SMTP server emulator...'
+  sudo -Hu cloud-user yaourt --noconfirm --sync --needed msmtp-mta ruby-mailcatcher
+  systemctl enable --now mailcatcher.service mailcatcher-smtp@25.socket
+  yes | cp --force /etc/msmtprc.aegir /etc/msmtprc
 
   _msg 'Generate per-user MySQL credentials and disable all shell password authentication...'
   [ "$(systemctl is-active mysqld.service)" = 'active' ] && systemctl stop mysqld.service
   sleep 3 && pkill mysqld
   [ -d /var/lib/mysql ] && rm --force --recursive /var/lib/mysql
-  mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql && systemctl start mysqld.service
+  mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql && systemctl start mysqld.service && sleep 3
   SQL_CMDS=()
   for USERNAME in aegir root; do
       # Create mysql user.
@@ -85,18 +99,14 @@ main() {
   _msg2 'Applying ACL onto Aegir files and folders...'
   paths=(
     /etc/drush
-    /usr/share/webapps/aegir
+    /var/lib/aegir
     /usr/share/webapps/hostmaster
   )
   setfacl --recursive --modify=g:http:rw- "${paths[@]}"
   find "${paths[@]}" -type d -exec sudo setfacl --modify=g:http:rwx {} +
 
-  _msg2 'Setting up msmtp and mailcatcher as an SMTP server emulator...'
-  systemctl enable --now mailcatcher.service mailcatcher-smtp.socket
-  systemctl start nginx.service
-  yes | cp --force /etc/msmtprc.aegir /etc/msmtprc
-
   _msg2 'Setting up the Aegir frontend, Hostmaster...'
+  systemctl start nginx.service
   sudo -Hu aegir drush hostmaster-install --web_group=http --http_service_type=nginx \
         --root=/usr/share/webapps/hostmaster \
         --aegir_db_user=$(sudo -Hu aegir sed --quiet --regexp-extended 's/^user=(.+)$/\1/p' ~aegir/.my.cnf) \

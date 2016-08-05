@@ -41,9 +41,9 @@ declare -A variables=(
 # $2 = the variable name of the key-value-pair array
 #
 set_variables() {
+  [ -n "$3" ] && format=json || format=auto
   local url=$1
   local -n array=$2
-  [ -n "$3" ] && format=json || format=auto
 
   # Apply variables for type-grouped arrays
   for key in "${!array[@]}"; do
@@ -59,7 +59,7 @@ environment=${environment:-DEV}
 
 main() {
   _msg "Installing phpseclib and enabling OpenSSL PHP extension..."
-  sudo -u cloud-user yaourt --aur-url https://aur4.archlinux.org --noconfirm --sync --needed pear-phpseclib
+  sudo -u cloud-user yaourt --noconfirm --sync --needed pear-phpseclib
   echo 'extension=openssl.so' >| $tempfile
   install -m644 $tempfile /etc/php/conf.d/openssl.ini
 
