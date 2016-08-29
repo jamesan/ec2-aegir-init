@@ -22,34 +22,50 @@
 source /usr/local/bin/utility-library
 tempfile=$(mktemp)
 
-declare -A users=(
-  [jan]=jamesan
+declare -a users=(
+  'James An:jamesan'
+  'Thomas Dury:ethnovode'
+  'Edouard Gabaudan:baroneddy'
 )
 
 main() {
+  _msg "Adding aegir-related setup to user:"
+  [ -L /etc/skel/platforms ] || ln --symbolic ~aegir/platforms /etc/skel
+  [ -L /etc/skel/hostmaster ] || ln --symbolic /usr/share/webapps/hostmaster /etc/skel
+  [ -z "$(grep platforms /etc/skel/.bash_profile)" ] && echo -e "\ncd ~/platforms" >> /etc/skel/.bash_profile
+
   _msg "Creating ${#users[@]} users:"
-  for user in "${!users[@]}"; do
+  for user in "${users[@]}"; do
+    user_name="$(cut --fields=1 --delimiter=: <<<$user)"
+    user_github="$(cut --fields=2 --delimiter=: <<<$user)"
+
+    # Derive user's account name in lowercase as first initial plus name's last word (i.e. usually the last name).
+    name=${user_name,,}
+    name=${name:0:1}${name##* }
+
+    # Derive user's home directory as username subdirectory of the default home base directory (i.e. usually /home).
+    user_home="$(grep HOME /etc/default/useradd | cut --fields=2- --delimiter==)/$name"
+
     # Skip users that already exist.
-    [ -n "$(getent passwd $user)" ] && continue
+    if getent passwd $name &>/dev/null; then
+      _msg2 "$user already exists. Skipping..."
+      continue
+    fi
 
     _msg2 "Creating $user..."
-    useradd --gid users --groups http --create-home --no-user-group $user
-    passwd --delete $user
-    sudo --set-home --user=$user ln --symbolic /usr/share/webapps $(eval echo ~$user)
-    echo -e "\ncd ~/webapps/aegir/platforms" >> $(eval echo ~$user)/.bash_profile
-  done
-  [ -L /etc/skel/webapps ] || ln --symbolic /usr/share/webapps /etc/skel
-  [ -z "$(grep platforms /etc/skel/.bash_profile)" ] && echo -e "\ncd ~/webapps/aegir/platforms" >> /etc/skel/.bash_profile
+    useradd --comment "$user_name" --home-dir "$user_home" --gid users --groups users,http --create-home --no-user-group $name
+    passwd --delete $name
 
-  _msg "Fetching user SSH public keys via GitHub's API:"
-  for user in "${!users[@]}"; do
-    _msg2 "Fetching $user's key..."
-    user_github="${users[$user]}"
-    user_home="$(eval echo ~$user)"
+    _msg2 "Enabling login using the $user's SSH keys as found on Github.com..."
     curl https://api.github.com/users/$user_github/keys | jq '.[].key' | tr --delete '"' >| $user_home/.ssh/authorized_keys
+    cat $user_home/.ssh/authorized_keys >> $tempfile
   done
 
-  _msg 'Enabling password-less sudo access for all users and restarting SSH daemon...'
+  # Authorise all SSH keys fetched from Github for all users to log in as the aegir system user.
+  [ -d ~aegir/.ssh ] || install --directory --group=http --owner=aegir --mode=700 ~aegir/.ssh
+  install --group=http --owner=aegir --mode=600 $tempfile ~aegir/.ssh
+
+  _msg 'Enabling password-less sudo access for all users in the "users" user group and restarting SSH daemon...'
   echo '%users ALL=(ALL) NOPASSWD: ALL' >| $tempfile
   install --mode=400 $tempfile /etc/sudoers.d/users
   systemctl restart sshd.service

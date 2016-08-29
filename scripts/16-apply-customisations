@@ -58,12 +58,7 @@ environment=$(hostname | egrep -o '(dev|qa|stg|adm)' | head -n1 | tr '[:lower:]'
 environment=${environment:-DEV}
 
 main() {
-  _msg "Installing phpseclib and enabling OpenSSL PHP extension..."
-  sudo -u cloud-user yaourt --noconfirm --sync --needed pear-phpseclib
-  echo 'extension=openssl.so' >| $tempfile
-  install -m644 $tempfile /etc/php/conf.d/openssl.ini
-
-  _msg "Defining DRG's Hostmaster site-wide variables..."
+  _msg "Defining project-specific Hostmaster site-wide variables..."
   set_variables hostmaster variables
 
   _msg "Generating SSH key for Aegir and pre-authorising GitHub.com's SSH host key..."
@@ -100,6 +95,9 @@ main() {
   [ -z "$(grep github.com ~aegir/.ssh/known_hosts)" ] && \
     ssh-keyscan github.com | \
     sudo -Hu aegir tee -a ~aegir/.ssh/known_hosts &>/dev/null
+
+  chown -R aegir:http /etc/drush /usr/share/webapps/hostmaster
+  sed -ni '/=> '\''hm'\''/!p;/ 0 => /p' /etc/drush/{hm,hostmaster}.alias.drushrc.php
 
   _msg 'Set up complete!'
 }
