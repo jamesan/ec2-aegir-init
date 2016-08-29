@@ -22,16 +22,23 @@
 source /usr/local/bin/utility-library
 tempfile=$(mktemp)
 
+declare -a KEYS=(
+  001BED01
+  A7B30DB9
+  293D771241515FE8
+  C2BF0BC433CFC8B3
+)
+
 main() {
   _msg 'Securing remote access...'
 
   _msg2 'Setting up user skeleton directory with GnuPG and SSH...'
   truncate --size=0 "$tempfile"
-  [ -f /etc/gnupg/gpgconf.conf ] || install --mode=644 -D /usr/share/doc/gnupg/examples/gpgconf.conf /etc/gnupg/gpgconf.conf
+  [ -f /etc/gnupg/gpgconf.conf ] || install --mode=644 -D cat  /etc/gnupg/gpgconf.conf
   if [ ! -d /etc/skel/.gnupg -o ! -d /etc/skel/.ssh ]; then
     install --mode=700 --directory /etc/skel/.gnupg
     install --mode=700 --directory /etc/skel/.ssh
-    install --mode=600 -D /usr/share/gnupg/gpg-conf.skel /etc/skel/.gnupg/gpg.conf
+    install --mode=600 -D /etc/pacman.d/gnupg/gpg.conf /etc/skel/.gnupg/gpg.conf
     install --mode=600 "$tempfile" /etc/skel/.gnupg/gpg-agent.conf
     install --mode=600 "$tempfile" /etc/skel/.gnupg/pubring.gpg
     install --mode=600 "$tempfile" /etc/skel/.gnupg/secring.gpg
@@ -78,7 +85,8 @@ main() {
   _msg 'Upgrading and installing system packages...'
 
   _msg2 'Installing missing base and base-devel packages and remove multilib gcc...'
-  echo -e '\n\ny\ny\n' | pacman --sync --refresh --sysupgrade --needed --ignore linux base base-devel
+  pacman --query --quiet --search lib32 | xargs pacman --remove --nodeps --nodeps --recursive --noconfirm
+  echo -e 'y\n\n\ny\ny\n' | pacman --sync --refresh --sysupgrade --needed --ignore linux base base-devel
 
   _msg2 'Re-creating pacman keyring...'
   rm -rf /etc/pacman.d/gnupg
@@ -88,9 +96,11 @@ main() {
   pacman-key --populate archlinux
   pacman-key --refresh-keys
 
-  _msg2 'Adding and trusting public GPG key for James An <james@jamesan.ca> and Steven Noonan <steven@uplinklabs.net>'
-  pacman-key --recv-key 001BED01 A7B30DB9
-  pacman-key --lsign-key 001BED01 A7B30DB9
+  _msg2 'Adding and trusting public GPG key for upstream software.'
+  pacman-key --recv-keys ${KEYS[@]}
+  for KEY in ${KEYS[@]}; do
+    yes | pacman-key --lsign-key $KEY
+  done
 
   _msg2 'Installing additional system utilities, removing all 32-bit packages...'
   yes | pacman --sync --needed bash-completion gcc gcc-libs git jq libpwquality mlocate moreutils jq rsync sudo unzip wget zip

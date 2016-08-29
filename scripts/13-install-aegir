@@ -21,6 +21,13 @@
 source /usr/local/bin/utility-library
 tempfile=$(mktemp)
 
+declare -a KEYS=(
+  001BED01
+  A7B30DB9
+  293D771241515FE8
+  C2BF0BC433CFC8B3
+)
+
 main() {
   _msg 'Setting up Aegir/LEMP stack...'
 
@@ -46,11 +53,12 @@ main() {
   done
 
   _msg2 'Installing drush, php 5.6, and byobu...'
-  sudo -Hu cloud-user gpg --recv-keys 293D771241515FE8
-  sudo -Hu cloud-user gpg --lsign-key 293D771241515FE8
-  sudo -Hu cloud-user gpg --recv-keys C2BF0BC433CFC8B3
-  sudo -Hu cloud-user gpg --lsign-key C2BF0BC433CFC8B3
-  sudo -Hu cloud-user yaourt --noconfirm --sync --needed byobu drush-git php56-fpm php56-gd
+
+  #~ sudo -Hu cloud-user gpg --recv-keys ${KEYS[@]}
+  #~ for KEY in ${KEYS[@]}; do
+    #~ sudo -Hu cloud-user gpg --lsign-key $KEY
+  #~ done
+  sudo -Hu cloud-user yaourt --noconfirm --sync --needed --m-arg --skippgpcheck byobu drush-git php-box php-fpm php-gd
 
   _msg2 'Installing aegir...'
   find /etc/drush -name '*.alias.drushrc.php' -delete
