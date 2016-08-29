@@ -70,6 +70,17 @@ main() {
   systemctl enable --now mailcatcher.service mailcatcher-smtp@25.socket
   yes | cp --force /etc/msmtprc.aegir /etc/msmtprc
 
+  _msg2 'Setting up solr-undertow as local Solr server...'
+  sudo -Hu cloud-user yaourt --noconfirm --sync --needed java-environment-common jdk8-openjdk solr-undertow solr6-war
+  sudo -Hu cloud-user yaourt --noconfirm --sync --needed solr-conf-drupal
+  solr_version="$(pacman --query --info solr6-war | grep '^Version' | tr -s ' :-' '\t' | cut --fields=2)"
+  sed "/solrVersion/{s/\".*\"/\"$solr_version\"/}" /etc/solr/default.conf
+  systemctl enable --now solr-undertow.service
+
+  _msg2 'Installing misc. utilities...'
+  sudo -Hu cloud-user yaourt --noconfirm --sync --needed --asdeps python-uritemplate.py
+  sudo -Hu cloud-user yaourt --noconfirm --sync --needed cope-git git-spindle-git htop hub iotop ncdu polkit
+
   _msg 'Generate per-user MySQL credentials and disable all shell password authentication...'
   [ "$(systemctl is-active mysqld.service)" = 'active' ] && systemctl stop mysqld.service
   sleep 3 && pkill mysqld
