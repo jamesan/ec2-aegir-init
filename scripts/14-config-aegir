@@ -186,20 +186,22 @@ main() {
   egrep -rIl '^\s*core\s*=\s*"?6.x"?\s*$' "$(drush @hm \dd)/sites" | xargs sudo sed -r -i 's#^\s*core\s*=\s*"?6.x"?\s*$#core = 7.x#'
   sudo -Hu aegir drush @hostmaster en --yes "${modules[@]}" "${modules_en[@]}"
 
-  #~ _msg "Installing Drupal distributions as Aegir platforms..."
-  #~ for platform in drupal-7 drupal-8; do
-    #~ sudo -u aegir drush dl $platform --destination=/var/lib/aegir/platforms --yes
-  #~ done
-  #~ for platform in $(find /var/lib/aegir/platforms -maxdepth 1 -mindepth 1 -type d -printf "%f\n"); do
-    #~ alias=@platform_$(echo ${platform^} | sed 's/[.-]//g')
-    #~ sudo -u aegir drush --root=/var/lib/aegir/platforms/$platform provision-save $alias --context_type='platform' --yes
-    #~ sudo -u aegir drush $alias provision-verify
-    #~ sudo -u aegir drush @hostmaster hosting-import $alias
-    #~ sudo -u aegir drush @hostmaster hosting-task $alias verify
-    #~ sudo -u aegir drush @hostmaster hosting-task $alias unlock
-  #~ done
+  _msg "Installing Drupal distributions as Aegir platforms..."
+  platform_root="$(realpath ~aegir/platforms)"
+  for platform in drupal-7 drupal-8; do
+    sudo -u aegir drush dl $platform --destination="$platform_root" --yes
+  done
+  for platform in $(find "$platform_root" -maxdepth 1 -mindepth 1 -type d -printf "%f\n"); do
+    alias=@platform_$(echo ${platform^} | sed 's/[.-]//g')
+    sudo -u aegir drush provision-save $alias --yes --context_type=platform --root="$platform_root/$platform"  --server=@server_master --web-server=@server_master
+    sudo -u aegir drush $alias provision-verify
+    sudo -u aegir drush @hostmaster hosting-import $alias
+    sudo -u aegir drush @hostmaster hosting-task $alias verify
+    sudo -u aegir drush @hostmaster hosting-task $alias unlock
+  done
 
-  systemctl restart aegir.service aegir.target mysqld.service nginx.service php56-fpm.service
+  sed -i 's#127.0.0.1:9000#unix:/run/php-fpm/php-fpm.sock#' /var/lib/aegir/config/includes/nginx_vhost_common.conf
+  systemctl restart aegir.service aegir.target mysqld.service nginx.service php-fpm.service
   _msg 'Set up complete!'
 }
 
