@@ -1,18 +1,30 @@
 #!/bin/sh
 
+source /usr/local/bin/utility-library
+
+set -ex
+
 # Generate scratch file to hold AWS JSON response for parsing.
 tempfile=$(mktemp)
 
 # Constants.
-image_id='ami-d39fedb3' # us-west-1
-instance_type='m3.xlarge'
-token_prefix='jamesan-create-us-w1c-'
-token_counter=01
+image_id='ami-9429fff4' # us-west-2, ebs-backed, x86_64
+key_name='james@jamesan.ca'\
+security_group='default'
+instance_type='t2.micro'
+subnet_id='subnet-89894bff'
+
 tag_prefix='jamesan'
-tag_suffix='us-w1c'
+
+# Derived constants
+# e.g. 'us-w2c'
+tag_suffix="$(echo us-west-2c | cut -f1,3 -d- | sed "s/-/-$(echo us-west-2c | cut -f2 -d- | cut -c1)/")"
+# e.g. 'jamesan-create-us-w2c-'
+token_prefix="$tag_prefix-create-$tag_suffix"
+
+token_counter=01
 vpc_cidr='192.168.255.240/28'
 environment='dev'
-availability_zone='us-west-1c'
 
 # Source IP addresses for firewall whitelist.
 ip_addrs=(
@@ -58,246 +70,33 @@ declare -A id_names=(
   [instance]=InstanceId
 )
 
-# Fetch values from AWS JSON response.
-function get_value() {
-  [ $# -eq 2 -o $# -eq 1 ] || return 1;
-  [ $# -eq 1 ] && file="$tempfile" || file="$2"
-  param="$1"
-  sed -n -r 's/^\s+"'"$param"'": "([^"]*)",?$/\1/p' "$file"
+function main() {
+  aws ec2 run-instances \
+    --image-id $image_id \
+    --key-name $key_name \
+    --security-groups default \
+    --instance-type $instance_type \
+    --count 1 \
+    |& tee /tmp/a
+    #~ --user-data HOSTNAME=aws.jamesan.ca \
+    #~ --subnet-id $subnet_id \
+    #~ --enable-api-termination \
+    #~ --instance-initiated-shutdown-behavior terminate \
+    #~ --ebs-optimized \
+    #~ --associate-public-ip-address \
 }
 
-function create_aws_resources() {
-  [ $# -eq 1 ] || _exit_with_error 1 'create_aws_resources(): parameter is required indicating where to continue creating resources.'
+# invoke main function if this script is executed as a command
+if [ "$CMD" = ${BASH_SOURCE##*/} ]; then
+  main "$@"
+else
+  unset main
+fi
 
-  case "$1" in
-    key) # Import root key.
-      aws ec2 describe-key-pairs --cli-input-json '{
-        "KeyNames": [
-          "'${names[key]}'"
-        ]
-      }' >| $tempfile
-      if [ $? -ne 0 ]; then
-        aws ec2 import-key-pair --cli-input-json '{
-          "KeyName": "'${names[key]}'",
-          "PublicKeyMaterial": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwczn2Gd/E9ecQfpaL1SCjk3VsMtSePx7dvmcoko1D8G0N6otVRt9BWDK6oDm3r1oGdPhWfvuCMIrJDA+YjJWVLhztG/Kxm7Hv227Z8H4LznSQmaR1RlkBHFjNMcLn2EZ+PpxThKpteO8CLAkIUHUYYEAgBFsmuxiS6UCKeBq6S5lS2m67RbU4QKf97IPql98iW5sKqytUER+ooH7qxV6Mzzj3ye94JMIKCGIYgKEX23g2o14lyzedhblTdlpUQRGRqqRIqumWkiyXQaJejvSh53kBbIjZ+Wgl7ZqNaRMnTii5ZHHb5OcfSBPXnwh7QkvTJMBNqtwHiVgCW31vTVa0wIDAQAB"
-        }' >| $tempfile
-      fi
-      names[key]="$(get_value KeyName)"
-      ;&
-
-    dhcp-options) # Create DHCP option set.
-
-      aws ec2 describe-dhcp-options --cli-input-json '{
-        "Filters": [
-          {
-            "Name": "tag:domain-name",
-            "Values": [
-              "ec2.internal"
-            ]
-          }
-        ]
-
-      }' >| $tempfile
-      if [ $? -ne 0 ]; then
-        aws ec2 create-dhcp-options --cli-input-json '{
-          "DhcpConfigurations": [
-            {
-              "Key": "domain-name",
-              "Values": [
-                "ec2.internal"
-              ]
-            },
-            {
-              "Key": "domain-name-servers",
-              "Values": [
-                "AmazonProvidedDNS"
-              ]
-            }
-          ]
-        }' >| $tempfile
-      fi
-      ids[dhcp-options]="$(get_value DhcpOptionsId)"
-      ;&
-
-    vpc) # Create virtual private cloud (VPC).
-      aws ec2 describe-vpcs --cli-input-json '{
-      }' >| $tempfile
-      aws ec2 create-vpc --cli-input-json '{
-        "CidrBlock": "'$vpc_cidr'",
-        "InstanceTenancy": "default"
-      }' >| $tempfile
-      ids[vpc]="$(get_value VpcId)"
-      aws ec2 create-vpc --cli-input-json '{
-        "CidrBlock": "'$vpc_cidr'",
-        "InstanceTenancy": "default"
-      }' >| $tempfile
-      ids[vpc]="$(get_value VpcId)"
-
-      # Enable DNS hostnames for the VPC.
-      aws ec2 modify-vpc-attribute --cli-input-json '{
-        "VpcId": "'${ids[vpc]}'",
-        "EnableDnsSupport": {
-          "Value": true
-        }
-      }'
-      aws ec2 modify-vpc-attribute --cli-input-json '{
-        "VpcId": "'${ids[vpc]}'",
-        "EnableDnsHostnames": {
-          "Value": true
-        }
-      }'
-      ;&
-
-    subnet) # Create subnet within intended availability zone.
-      aws ec2 create-subnet --cli-input-json '{
-        "VpcId": "'${ids[vpc]}'",
-        "CidrBlock": "'$vpc_cidr'",
-        "AvailabilityZone": "us-west-1a"
-      }' >| $tempfile
-      ids[subnet]="$(get_value SubnetId)"
-      ;&
-
-    group) # Create security group.
-      aws ec2 create-security-group --cli-input-json '{
-        "GroupName": "'$tag_prefix-'sg'-$tag_suffix'",
-        "Description": "Insight Platform Group for us-e1a ",
-        "VpcId": "'${ids[vpc]}'"
-      }' >| $tempfile
-      ids[group]="$(get_value GroupId)"
-
-      # Add ingress rules to security group.
-      aws ec2 authorize-security-group-ingress --cli-input-json '{
-        "GroupId": "'${ids[security-group]}'",
-        "IpProtocol": "tcp",
-        "FromPort": 80,
-        "ToPort": 80,
-        "CidrIp": "0.0.0.0/0"
-      }'
-      for ip_addr in "${ip_addrs[@]}"; do
-        [ $ip_addr = 0.0.0.0 ] && continue
-        aws ec2 authorize-security-group-ingress --cli-input-json '{
-          "GroupId": "'${ids[security-group]}'",
-          "IpProtocol": "-1",
-          "CidrIp": "'$ip_addr'/32"
-        }'
-      done
-
-      ;&
-
-    instance) # Launch EC2 instance with above-instantiated resources.
-      aws ec2 run-instances --cli-input-json '{
-        "ImageId": "'$ids[image]'",
-        "MinCount": 1,
-        "MaxCount": 1,
-        "KeyName": "'$tag_prefix-$instance_name-$tag_suffix'",
-        "SecurityGroupIds": [
-          "'${ids[security-group]}'"
-        ],
-        "UserData": "#!/bin/sh
-hostnamectl set-hostname '"'"'insight-'$environment'.decisionresourcesgroup.com'"'"'
-hostnamectl set-location '"'"'AWS: '$availability_zone"'"'",
-        "InstanceType": "'$instance_type'",
-        "Placement": {
-          "AvailabilityZone": "'$availability_zone'",
-          "Tenancy": "default"
-        },
-        "BlockDeviceMappings": [
-          {
-            "DeviceName": "/dev/sda1",
-            "Ebs": {
-              "VolumeSize": 8,
-              "DeleteOnTermination": true,
-              "VolumeType": "gp2"
-            }
-          }
-        ],
-        "Monitoring": {
-            "Enabled": true
-        },
-        "SubnetId": "'${ids[subnet]}'",
-        "DisableApiTermination": false,
-        "InstanceInitiatedShutdownBehavior": "stop",
-        "ClientToken": "'$tag_prefix-'token-'$token_counter-$tag_suffix'",
-        "NetworkInterfaces": [
-          {
-            "DeviceIndex": 0,
-            "SubnetId": "'${ids[subnet]}'",
-            "Groups": [
-              "'${ids[security-group]}'"
-            ],
-            "DeleteOnTermination": true,
-            "AssociatePublicIpAddress": true
-          }
-        ]
-      }' >| $tempfile
-      ids[instance]="$(get_value InstanceId)"
-      ;&
-
-    tags) # Create name tags for above-instantiated resources.
-      declare -A tags_id=(
-        [${ids[vpc]}]=${tags[vpc]}
-        [${ids[dhcp-options]}]=${tags[dhcp_options]}
-        [${ids[subnet]}]=${tags[subnet]}
-        [${ids[security-group]}]=${tags[group]}
-        [${ids[instance]}]=${tags[instance]}
-      )
-      for resource_id in "${!tags_id[@]}"; do
-        aws ec2 create-tags --cli-input-json '{
-          "Resources": [
-            "'$resource_id'"
-          ],
-          "Tags": [
-            {
-              "Key": "Name",
-              "Value": "'$tag_prefix-${tags_id[$resource_id]}-$tag_suffix'"
-            }
-          ]
-        }'
-      done
-      ;&
-
-    *) # Output resultant instance details and block until instance is running and status=ok.
-      aws ec2 describe-instances --instance-ids ${ids[instance]}
-      aws ec2 wait instance-status-ok --instance-id ${ids[instance]}
-      ;;
-
-  esac
-}
-
-aws ec2 describe-key-pairs --key-names $names[key] &>/dev/null || create_aws_resources key
-
-for type in "${resource_types[@]}"; do
-  echo $type
-  [ -v names[$type] ] \
-    && name="${names[$type]}" \
-    || name="${tag_prefix}-${type}-${tag_suffix}"
-  command="describe-${type}s"
-  command="${command/ss/s}"
-  aws ec2 $command --filter Name=tag:Name,Values=$name >| $tempfile \
-    && ids[$type]="$(get_value ${id_names[$type]})"
-    #~ || create_aws_resources $type
-  echo "$type-id = ${ids[$type]}"
-done
-
-aws ec2 describe-dhcp-options --filter Name=tag:Name,Values=${names[dhcp-options]} >| $tempfile \
-  && dhcp_options_id="$(get_value DhcpOptionsId)" \
-  || create_aws_resources dhcp-options
-aws ec2 describe-vpcs --filter Name=tag:Name,Values=${names[vpc]} >| $tempfile \
-  && vpc_id="$(get_value VpcId)" \
-  || create_aws_resources vpc{ vpc_id="$(get_value VpcId)";
-aws ec2 describe-subnets --filter Name=tag:Name,Values=${names[subnet]} >| $tempfile \
-  && subnet_id="$(get_value SubnetId)" \
-  || create_aws_resources subnet
-aws ec2 describe-security-groups --filter Name=tag:Name,Values=${names[security-group]} >| $tempfile \
-  && group_id="$(get_value GroupId)" \
-  || create_aws_resources security-group
-aws ec2 describe-instances --filter Name=tag:Name,Values=${names[instance]} >| $tempfile \
-  && instance_id="$(get_value InstanceId)" \
-  || create_aws_resources instance
-
-##
-# Get instance SSH host keys
-##
-#~ aws ec2 get-console-output --instance-id ${ids[instance]} >| $tempfile
-#~ echo -e $(cat $tempfile) | sed -n '/-----BEGIN SSH HOST KEY FINGERPRINTS-----/,/-----END SSH HOST KEY FINGERPRINTS-----/p' | head -n-1 | tail -n+2
-5
+#~ # Fetch values from AWS JSON response.
+#~ function get_value() {
+  #~ [ $# -eq 2 -o $# -eq 1 ] || return 1;
+  #~ [ $# -eq 1 ] && file="$tempfile" || file="$2"
+  #~ param="$1"
+  #~ sed -n -r 's/^\s+"'"$param"'": "([^"]*)",?$/\1/p' "$file"
+#~ }
